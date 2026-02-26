@@ -61,7 +61,32 @@ non-removable card`.
 
 ---
 
-### Known remaining issues
+## 2026-02-26 — Fix WiFi chip identification (BCM4330 not BCM43362)
+
+**Symptom:** `brcmfmac: probe of mmc1:0001:1 failed with error -110` even after
+mmc1 clock fix and NVRAM symlink.
+
+**Root cause:** The onboard WiFi chip is **BCM4330** (SDIO `0x02d0:0x4330`),
+not BCM43362 as previously assumed. The wrong firmware package was being
+installed. The `linux-firmware-bcm4330` package already ships
+`brcmfmac4330-sdio.cubietech,a80-cubieboard4.bin` which matches the board's
+DT compatible string (`cubietech,a80-cubieboard4`) exactly.
+
+**Fix:**
+- Added `require conf/machine/include/hardware/ap6330.inc` to `cubieboard4.conf`.
+  This automatically pulls in `kernel-module-brcmfmac` and
+  `linux-firmware-bcm4330` via `MACHINE_EXTRA_RRECOMMENDS/RDEPENDS`.
+- Replaced `linux-firmware-bcm43362` with `linux-firmware-bcm4330` in
+  `kas.yml`.
+- Removed the wrong BCM43362 NVRAM symlink recipe
+  (`brcmfmac-nvram-cubieboard4_1.0.bb`) — no longer needed since
+  `linux-firmware-bcm4330` ships the correct board-specific file.
+
+**Files changed:**
+- `kas.yml`
+- `meta-cubieboard4/conf/machine/cubieboard4.conf`
+
+
 
 | Issue | Details |
 |---|---|

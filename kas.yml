@@ -9,7 +9,7 @@ local_conf_header:
   debug-tweaks: |
     EXTRA_IMAGE_FEATURES += "debug-tweaks"
   wifi: |
-    IMAGE_INSTALL:append = " kernel-module-brcmfmac linux-firmware-bcm43362 wpa-supplicant iw"
+    IMAGE_INSTALL:append = " linux-firmware-bcm4330 wpa-supplicant iw"
 
 repos:
   poky:
