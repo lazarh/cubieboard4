@@ -1,0 +1,19 @@
+# Yocto build output — fully managed by kas, do not commit
+build/
+tmp/
+
+# kas-managed repos (fetched automatically by kas)
+poky/
+meta-arm/
+meta-openembedded/
+meta-sunxi/
+
+# Logs and serial captures
+*.log
+screenlog.*
+
+# Editor and OS artifacts
+.DS_Store
+*.swp
+*.swo
+*~
