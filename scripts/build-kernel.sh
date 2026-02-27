@@ -65,7 +65,7 @@ if [[ ! -f "${PATCH_STAMP}" ]]; then
     for p in "${PATCHES_DIR}"/*.patch; do
         [[ -f "${p}" ]] || continue
         echo "    Applying $(basename "${p}")..."
-        patch -N -p1 -d "${KERNEL_SRC}" < "${p}"
+        patch -N -r /dev/null -p1 -d "${KERNEL_SRC}" < "${p}" || true
     done
     touch "${PATCH_STAMP}"
     echo "    Patches applied."
