@@ -70,6 +70,14 @@ if [[ ! -f "${PATCH_STAMP}" ]]; then
         echo "    Applying: $(basename "${patch}")"
         patch -d "${UBOOT_SRC}" -p1 < "${patch}"
     done
+
+    # Disable pylibfdt Python bindings: U-Boot 2024.01's generated SWIG wrapper
+    # (scripts/dtc/pylibfdt/libfdt_wrap.c) is incompatible with SWIG >= 4.2.
+    # The Python bindings are not needed to build the bootloader binary.
+    echo "==> Disabling pylibfdt build (SWIG >= 4.2 incompatibility)..."
+    sed -i 's/^always-.*rebuild/# pylibfdt disabled/' \
+        "${UBOOT_SRC}/scripts/dtc/pylibfdt/Makefile"
+
     touch "${PATCH_STAMP}"
 fi
 
@@ -80,18 +88,15 @@ make -C "${UBOOT_SRC}" \
     ARCH="${ARCH}" \
     CROSS_COMPILE="${CROSS_COMPILE}" \
     O="${BUILD_DIR}" \
-    PYTHON=nopython PYTHON3=nopython3 \
     Cubieboard4_defconfig
 
 # ── Build ──────────────────────────────────────────────────────────────────
-# PYTHON/PYTHON3 are set to a non-existent binary to skip building the
-# pylibfdt Python bindings, which fail with SWIG >= 4.2 in U-Boot 2024.01.
+
 echo "==> Building U-Boot (-j${JOBS})..."
 make -C "${UBOOT_SRC}" \
     ARCH="${ARCH}" \
     CROSS_COMPILE="${CROSS_COMPILE}" \
     O="${BUILD_DIR}" \
-    PYTHON=nopython PYTHON3=nopython3 \
     -j"${JOBS}"
 
 echo "==> U-Boot binary: ${BUILD_DIR}/u-boot-sunxi-with-spl.bin"
