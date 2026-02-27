@@ -188,8 +188,10 @@ fi
 
 # ── SSH — allow root login ──────────────────────────────────────────────────
 
-echo "==> Configuring sshd (PermitRootLogin yes)..."
+echo "==> Configuring sshd (PermitRootLogin yes, PasswordAuthentication yes)..."
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' \
+    "${SYSROOT}/etc/ssh/sshd_config"
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' \
     "${SYSROOT}/etc/ssh/sshd_config"
 chroot "${SYSROOT}" systemctl enable ssh.service || true
 
