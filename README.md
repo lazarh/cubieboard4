@@ -93,3 +93,28 @@ This clones the running SD card system to the internal eMMC (`/dev/mmcblk2`). Re
 ## Source tarballs
 
 Source tarballs are downloaded to `build/sources/` on first run and reused on subsequent runs. Delete them to force a fresh download.
+
+## Troubleshooting
+
+### U-Boot build fails with SWIG / pylibfdt error
+
+Symptom: build fails with errors like
+```
+error: too few arguments to function 'SWIG_Python_AppendOutput'
+```
+
+This is a known incompatibility between U-Boot 2024.01 and SWIG ≥ 4.2.  
+`build-uboot.sh` works around it automatically by injecting a patched `build_ext`
+subclass into `scripts/dtc/pylibfdt/setup.py` that post-processes the SWIG-generated
+`libfdt_wrap.c` and adds the required third argument to every
+`SWIG_Python_AppendOutput` call.
+
+If you hit the error, the patch stamp may be stale. Remove it and retry:
+```bash
+rm -f build/sources/u-boot-2024.01/.patched
+scripts/build-uboot.sh
+```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full history of changes.
