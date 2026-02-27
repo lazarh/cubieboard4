@@ -78,7 +78,7 @@ if [[ ! -f "${PATCH_STAMP}" ]]; then
     # generates libfdt_wrap.c so the C compiler is happy.
     echo "==> Patching pylibfdt setup.py for SWIG >= 4.2 compatibility..."
     python3 - "${UBOOT_SRC}/scripts/dtc/pylibfdt/setup.py" <<'PYEOF'
-import sys, re
+import sys
 
 path = sys.argv[1]
 with open(path) as f:
@@ -95,35 +95,64 @@ src = src.replace(
     'from setuptools.command.build_ext import build_ext as _build_ext'
 )
 
-# 2. Build the regex strings explicitly to avoid escape-sequence issues
-# inside triple-quoted strings. Written verbatim to the file.
-re_pattern = "r'SWIG_Python_AppendOutput" + r"\(" + r"([^,)]+),\s*([^,)]+)" + r"\)'"
-re_replace = "r'SWIG_Python_AppendOutput(" + r"\1" + ", " + r"\2" + ", 0)'"
+# 2. Insert build_ext subclass that fixes 2-arg SWIG_Python_AppendOutput calls.
+# SWIG 4.2 added a third argument (is_void=0 for normal calls), but
+# U-Boot 2024.01's libfdt.i typemaps still emit 2-arg calls when processed by
+# any SWIG version. We count parentheses to find each call's closing paren and
+# add ', 0' when there are exactly 2 top-level arguments — safe for all nested
+# patterns like SWIG_From_int(*arg), SWIG_NewPointerObj((void *)p, ...), etc.
+swig_fix_class = '''
+def _fix_swig_append_output(content):
+    """Add missing third argument to all 2-arg SWIG_Python_AppendOutput calls."""
+    marker = 'SWIG_Python_AppendOutput('
+    out = []
+    i = 0
+    while i < len(content):
+        idx = content.find(marker, i)
+        if idx == -1:
+            out.append(content[i:])
+            break
+        out.append(content[i:idx + len(marker)])
+        j = idx + len(marker)
+        depth = 1
+        top_commas = 0
+        while j < len(content) and depth > 0:
+            c = content[j]
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+                if depth == 0:
+                    break
+            elif c == ',' and depth == 1:
+                top_commas += 1
+            j += 1
+        # j points at the closing ')'
+        inner = content[idx + len(marker):j]
+        if top_commas == 1:   # 2 args -> add is_void=0
+            out.append(inner + ', 0)')
+        else:
+            out.append(inner + ')')
+        i = j + 1
+    return ''.join(out)
 
-swig_fix_class = (
-    '\nclass build_ext(_build_ext):\n'
-    '    """Post-process SWIG wrapper for SWIG >= 4.2 compatibility.\n\n'
-    '    SWIG 4.2 changed SWIG_Python_AppendOutput to require a third\n'
-    '    argument (is_void), but libfdt.i still emits 2-argument calls.\n'
-    '    """\n'
-    '    def swig_sources(self, sources, extension):\n'
-    '        result = super().swig_sources(sources, extension)\n'
-    '        for wrap in result:\n'
-    '            if not wrap.endswith("_wrap.c"):\n'
-    '                continue\n'
-    '            with open(wrap) as f:\n'
-    '                content = f.read()\n'
-    '            fixed = re.sub(\n'
-    '                ' + re_pattern + ',\n'
-    '                ' + re_replace + ',\n'
-    '                content,\n'
-    '            )\n'
-    '            if fixed != content:\n'
-    '                with open(wrap, "w") as f:\n'
-    '                    f.write(fixed)\n'
-    '        return result\n\n'
-)
 
+class build_ext(_build_ext):
+    """Post-process SWIG wrapper for SWIG >= 4.2 compatibility."""
+    def swig_sources(self, sources, extension):
+        result = super().swig_sources(sources, extension)
+        for wrap in result:
+            if not wrap.endswith('_wrap.c'):
+                continue
+            with open(wrap) as f:
+                content = f.read()
+            fixed = _fix_swig_append_output(content)
+            if fixed != content:
+                with open(wrap, 'w') as f:
+                    f.write(fixed)
+        return result
+
+'''
 src = src.replace('setup(\n', swig_fix_class + 'setup(\n', 1)
 
 # 3. Register in cmdclass
