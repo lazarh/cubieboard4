@@ -75,7 +75,7 @@ if [[ ! -f "${PATCH_STAMP}" ]]; then
     # (scripts/dtc/pylibfdt/libfdt_wrap.c) is incompatible with SWIG >= 4.2.
     # The Python bindings are not needed to build the bootloader binary.
     echo "==> Disabling pylibfdt build (SWIG >= 4.2 incompatibility)..."
-    sed -i 's/^always-.*rebuild/# pylibfdt disabled/' \
+    sed -i 's/^always += _libfdt\.so libfdt\.py$/# pylibfdt build disabled/' \
         "${UBOOT_SRC}/scripts/dtc/pylibfdt/Makefile"
 
     touch "${PATCH_STAMP}"
