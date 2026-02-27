@@ -191,6 +191,19 @@ fi
 
 echo "brcmfmac" >> "${SYSROOT}/etc/modules"
 
+# ── wpa_supplicant global config ────────────────────────────────────────────
+# BCM4330 does not support P2P. Without p2p_disabled=1 wpa_supplicant tries
+# to create a p2p-dev-wlan0 virtual interface, times out, and terminates —
+# dropping the connection immediately after association.
+# NetworkManager's wpa_supplicant backend reads this file automatically.
+
+mkdir -p "${SYSROOT}/etc/wpa_supplicant"
+cat > "${SYSROOT}/etc/wpa_supplicant/wpa_supplicant.conf" <<'EOF'
+ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev
+update_config=1
+p2p_disabled=1
+EOF
+
 # ── Embed install-to-emmc.sh ────────────────────────────────────────────────
 
 echo "==> Embedding install-to-emmc.sh..."
