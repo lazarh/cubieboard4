@@ -71,12 +71,71 @@ if [[ ! -f "${PATCH_STAMP}" ]]; then
         patch -N -d "${UBOOT_SRC}" -p1 < "${patch}" || true
     done
 
-    # Disable pylibfdt Python bindings: U-Boot 2024.01's generated SWIG wrapper
-    # (scripts/dtc/pylibfdt/libfdt_wrap.c) is incompatible with SWIG >= 4.2.
-    # The Python bindings are not needed to build the bootloader binary.
-    echo "==> Disabling pylibfdt build (SWIG >= 4.2 incompatibility)..."
-    sed -i 's/^always += _libfdt\.so libfdt\.py$/# pylibfdt build disabled/' \
-        "${UBOOT_SRC}/scripts/dtc/pylibfdt/Makefile"
+    # Fix pylibfdt setup.py for SWIG >= 4.2 compatibility.
+    # SWIG 4.2 changed SWIG_Python_AppendOutput from 2 to 3 arguments, but
+    # the libfdt.i typemaps in U-Boot 2024.01 still generate 2-arg call
+    # sites. Override build_ext.swig_sources() to fix the calls after SWIG
+    # generates libfdt_wrap.c so the C compiler is happy.
+    echo "==> Patching pylibfdt setup.py for SWIG >= 4.2 compatibility..."
+    python3 - "${UBOOT_SRC}/scripts/dtc/pylibfdt/setup.py" <<'PYEOF'
+import sys, re
+
+path = sys.argv[1]
+with open(path) as f:
+    src = f.read()
+
+# Idempotency: skip if already patched
+if 'build_ext as _build_ext' in src:
+    sys.exit(0)
+
+# 1. Add build_ext import
+src = src.replace(
+    'from setuptools.command.build_py import build_py as _build_py',
+    'from setuptools.command.build_py import build_py as _build_py\n'
+    'from setuptools.command.build_ext import build_ext as _build_ext'
+)
+
+# 2. Build the regex strings explicitly to avoid escape-sequence issues
+# inside triple-quoted strings. Written verbatim to the file.
+re_pattern = "r'SWIG_Python_AppendOutput" + r"\(" + r"([^,)]+),\s*([^,)]+)" + r"\)'"
+re_replace = "r'SWIG_Python_AppendOutput(" + r"\1" + ", " + r"\2" + ", 0)'"
+
+swig_fix_class = (
+    '\nclass build_ext(_build_ext):\n'
+    '    """Post-process SWIG wrapper for SWIG >= 4.2 compatibility.\n\n'
+    '    SWIG 4.2 changed SWIG_Python_AppendOutput to require a third\n'
+    '    argument (is_void), but libfdt.i still emits 2-argument calls.\n'
+    '    """\n'
+    '    def swig_sources(self, sources, extension):\n'
+    '        result = super().swig_sources(sources, extension)\n'
+    '        for wrap in result:\n'
+    '            if not wrap.endswith("_wrap.c"):\n'
+    '                continue\n'
+    '            with open(wrap) as f:\n'
+    '                content = f.read()\n'
+    '            fixed = re.sub(\n'
+    '                ' + re_pattern + ',\n'
+    '                ' + re_replace + ',\n'
+    '                content,\n'
+    '            )\n'
+    '            if fixed != content:\n'
+    '                with open(wrap, "w") as f:\n'
+    '                    f.write(fixed)\n'
+    '        return result\n\n'
+)
+
+src = src.replace('setup(\n', swig_fix_class + 'setup(\n', 1)
+
+# 3. Register in cmdclass
+src = src.replace(
+    "cmdclass = {'build_py' : build_py},",
+    "cmdclass = {'build_py' : build_py, 'build_ext': build_ext},"
+)
+
+with open(path, 'w') as f:
+    f.write(src)
+print("    setup.py patched successfully.")
+PYEOF
 
     touch "${PATCH_STAMP}"
 fi
