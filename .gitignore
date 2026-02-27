@@ -1,0 +1,5 @@
+build/
+debian-rootfs/
+*.img
+*.img.gz
+*.img.gz.bmap
