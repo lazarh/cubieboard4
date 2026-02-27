@@ -68,7 +68,7 @@ if [[ ! -f "${PATCH_STAMP}" ]]; then
     for patch in "${PATCHES_DIR}"/*.patch; do
         [[ -f "${patch}" ]] || continue
         echo "    Applying: $(basename "${patch}")"
-        patch -d "${UBOOT_SRC}" -p1 < "${patch}"
+        patch -N -d "${UBOOT_SRC}" -p1 < "${patch}" || true
     done
 
     # Disable pylibfdt Python bindings: U-Boot 2024.01's generated SWIG wrapper
