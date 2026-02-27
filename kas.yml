@@ -3,13 +3,13 @@ header:
 
 machine: cubieboard4
 distro: poky
-target: core-image-minimal
+target:
+  - virtual/kernel
+  - virtual/bootloader
 
 local_conf_header:
   debug-tweaks: |
     EXTRA_IMAGE_FEATURES += "debug-tweaks"
-  wifi: |
-    IMAGE_INSTALL:append = " linux-firmware-bcm4330 wpa-supplicant iw"
 
 repos:
   poky:
