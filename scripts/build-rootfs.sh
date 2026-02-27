@@ -186,7 +186,21 @@ else
     echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found — firmware-brcm80211 not installed?"
 fi
 
-# ── Kernel modules to load at boot ─────────────────────────────────────────
+# ── SSH — allow root login ──────────────────────────────────────────────────
+
+echo "==> Configuring sshd (PermitRootLogin yes)..."
+sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' \
+    "${SYSROOT}/etc/ssh/sshd_config"
+chroot "${SYSROOT}" systemctl enable ssh.service || true
+
+# ── NTP — sync time once network is up ─────────────────────────────────────
+# systemd-timesyncd is bundled with systemd; enable it so the clock is set
+# automatically after WiFi (or Ethernet) connects.
+
+echo "==> Enabling systemd-timesyncd (NTP)..."
+chroot "${SYSROOT}" systemctl enable systemd-timesyncd.service || true
+
+
 # Ensure brcmfmac loads at boot regardless of udev modalias matching.
 
 echo "brcmfmac" >> "${SYSROOT}/etc/modules"
