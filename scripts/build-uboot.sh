@@ -80,15 +80,18 @@ make -C "${UBOOT_SRC}" \
     ARCH="${ARCH}" \
     CROSS_COMPILE="${CROSS_COMPILE}" \
     O="${BUILD_DIR}" \
+    PYTHON=nopython PYTHON3=nopython3 \
     Cubieboard4_defconfig
 
 # ── Build ──────────────────────────────────────────────────────────────────
-
+# PYTHON/PYTHON3 are set to a non-existent binary to skip building the
+# pylibfdt Python bindings, which fail with SWIG >= 4.2 in U-Boot 2024.01.
 echo "==> Building U-Boot (-j${JOBS})..."
 make -C "${UBOOT_SRC}" \
     ARCH="${ARCH}" \
     CROSS_COMPILE="${CROSS_COMPILE}" \
     O="${BUILD_DIR}" \
+    PYTHON=nopython PYTHON3=nopython3 \
     -j"${JOBS}"
 
 echo "==> U-Boot binary: ${BUILD_DIR}/u-boot-sunxi-with-spl.bin"
