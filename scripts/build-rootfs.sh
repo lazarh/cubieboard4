@@ -166,22 +166,26 @@ else
 fi
 
 # ── BCM4330 WiFi firmware NVRAM ─────────────────────────────────────────────
-# firmware-brcm80211 ships the driver firmware but may lack the NVRAM text
-# file for the specific brcmfmac4330-sdio variant on CubieBoard4.
+# firmware-brcm80211 ships brcmfmac4330-sdio.Prowise-PT301.txt (same AMPAK AP6330
+# module as on CubieBoard4). A generic brcmfmac4330-sdio.txt does not exist in
+# linux-firmware; add a board-specific symlink so brcmfmac finds it automatically.
 
-echo "==> Fetching BCM4330 NVRAM from linux-firmware..."
+echo "==> Installing BCM4330 NVRAM symlink..."
 BRCM_DIR="${SYSROOT}/usr/lib/firmware/brcm"
 mkdir -p "${BRCM_DIR}"
-if curl -fsSL \
-    "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/brcm/brcmfmac4330-sdio.txt" \
-    -o "${BRCM_DIR}/brcmfmac4330-sdio.txt"; then
-    # Board-specific symlink: driver checks <board-compatible>.txt first
-    ln -sf brcmfmac4330-sdio.txt \
+if [[ -f "${BRCM_DIR}/brcmfmac4330-sdio.Prowise-PT301.txt" ]]; then
+    # Driver looks up <board-compatible>.txt first; fall through to Prowise NVRAM.
+    ln -sf brcmfmac4330-sdio.Prowise-PT301.txt \
         "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.txt"
-    echo "    BCM4330 NVRAM installed."
+    echo "    BCM4330 NVRAM symlink installed (Prowise-PT301 → cubietech,a80-cubieboard4)."
 else
-    echo "    WARNING: Could not fetch BCM4330 NVRAM (no network?). WiFi may not work."
+    echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found — firmware-brcm80211 not installed?"
 fi
+
+# ── Kernel modules to load at boot ─────────────────────────────────────────
+# Ensure brcmfmac loads at boot regardless of udev modalias matching.
+
+echo "brcmfmac" >> "${SYSROOT}/etc/modules"
 
 # ── Embed install-to-emmc.sh ────────────────────────────────────────────────
 
