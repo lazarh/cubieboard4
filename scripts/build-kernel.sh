@@ -29,6 +29,8 @@ MODULES_DIR="${BUILD_DIR}/modules"
 SOURCES_DIR="${REPO_ROOT}/build/sources"
 KERNEL_SRC="${SOURCES_DIR}/linux-${KERNEL_VERSION}"
 CONFIG_FRAGMENT="${REPO_ROOT}/configs/kernel/cubieboard4.config"
+PATCHES_DIR="${REPO_ROOT}/patches/kernel"
+PATCH_STAMP="${KERNEL_SRC}/.patched"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,19 @@ echo "${KERNEL_SHA256}  ${TARBALL}" | sha256sum -c -
 if [[ ! -d "${KERNEL_SRC}" ]]; then
     echo "==> Extracting kernel source..."
     tar -xJf "${TARBALL}" -C "${SOURCES_DIR}"
+fi
+
+# ── Apply patches ──────────────────────────────────────────────────────────
+
+if [[ ! -f "${PATCH_STAMP}" ]]; then
+    echo "==> Applying kernel patches..."
+    for p in "${PATCHES_DIR}"/*.patch; do
+        [[ -f "${p}" ]] || continue
+        echo "    Applying $(basename "${p}")..."
+        patch -N -p1 -d "${KERNEL_SRC}" < "${p}"
+    done
+    touch "${PATCH_STAMP}"
+    echo "    Patches applied."
 fi
 
 # ── Configure ─────────────────────────────────────────────────────────────
