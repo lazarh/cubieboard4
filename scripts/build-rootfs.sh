@@ -122,7 +122,7 @@ chroot "${SYSROOT}" systemctl enable serial-getty@ttyS0.service || true
 echo "==> Installing packages..."
 chroot "${SYSROOT}" apt-get update -q
 chroot "${SYSROOT}" apt-get install -y --no-install-recommends \
-    systemd-sysv dbus \
+    systemd-sysv dbus systemd-timesyncd \
     iproute2 iputils-ping iw wpasupplicant network-manager \
     openssh-server \
     firmware-brcm80211 \
