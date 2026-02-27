@@ -19,6 +19,17 @@ Builds a minimal **Debian 13 (trixie, armhf)** image for the CubieBoard4 (Allwin
 > **Docker note:** The board is 32-bit ARMv7. Only container images built for
 > `linux/arm/v7` will run. Most modern `arm64`-only images will not work.
 
+## Quick start (fresh machine)
+
+```sh
+git clone https://github.com/lazarh/cubieboard4.git && cd cubieboard4
+pip install kas
+sudo bash install-deps.sh
+kas build kas.yml                         # build kernel + U-Boot (hours, first time)
+sudo bash scripts/build-debian-rootfs.sh  # bootstrap Debian 13 rootfs (needs internet)
+sudo bash scripts/assemble-sd-image.sh    # produce cubieboard4-debian13.img.gz
+```
+
 ## Prerequisites
 
 Install `kas` and all host dependencies:
@@ -31,6 +42,8 @@ sudo bash install-deps.sh
 `install-deps.sh` installs Yocto build tools **plus** the debootstrap toolchain
 (`qemu-user-static`, `debootstrap`, `parted`, `dosfstools`, `rsync`).
 
+Requires a **Debian/Ubuntu x86-64** build host with internet access.
+
 ## Build
 
 ### Step 1 — Build kernel and U-Boot with Yocto
@@ -41,6 +54,7 @@ kas build kas.yml
 
 This compiles U-Boot and the Linux kernel (with Docker-compatible config).
 Artifacts land in `build/tmp/deploy/images/cubieboard4/`.
+The first build takes a long time (hours) as it compiles the full toolchain from source.
 
 ### Step 2 — Bootstrap the Debian 13 rootfs
 
