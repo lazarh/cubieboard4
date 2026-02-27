@@ -81,6 +81,14 @@ Write the image to a microSD card (replace `/dev/sdX`):
 bmaptool copy cubieboard4-debian13.img.gz /dev/sdX
 ```
 
+`assemble-sd-image.sh` produces a matching `cubieboard4-debian13.img.gz.bmap`
+alongside the image; bmaptool picks it up automatically.  If it is missing, use
+`--nobmap`:
+
+```sh
+bmaptool copy --nobmap cubieboard4-debian13.img.gz /dev/sdX
+```
+
 Or with plain `dd`:
 
 ```sh

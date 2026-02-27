@@ -132,10 +132,11 @@ LOOP_DEV=""
 echo "==> Compressing to ${OUTPUT}.gz ..."
 pigz -9 --keep "${OUTPUT}" 2>/dev/null || gzip -9 -k "${OUTPUT}"
 
-# Optional bmap for bmaptool (faster flashing)
+# Generate bmap from the uncompressed image; name it after the .gz so
+# bmaptool can find it automatically (it looks for <image>.bmap).
 if command -v bmaptool >/dev/null 2>&1; then
-    bmaptool create "${OUTPUT}" > "${OUTPUT}.bmap"
-    echo "==> bmap written to ${OUTPUT}.bmap"
+    bmaptool create "${OUTPUT}" > "${OUTPUT}.gz.bmap"
+    echo "==> bmap written to ${OUTPUT}.gz.bmap"
 fi
 
 echo ""

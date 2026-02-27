@@ -1,5 +1,66 @@
 # Changelog
 
+## 2026-02-27 — Fix rootfs build script (three bugs)
+
+### Fix 1: `nand-utils` is not a Debian package
+
+`nand-utils` is a Yocto/OpenEmbedded recipe name and does not exist in Debian
+repositories.  All NAND/MTD tools (`nanddump`, `nandwrite`, `flash_erase`, …)
+are already provided by `mtd-utils`, which was already listed.  Removed the
+invalid entry.
+
+**File changed:** `scripts/build-debian-rootfs.sh` — removed `nand-utils` from
+the `apt-get install` package list.
+
+---
+
+### Fix 2: virtual filesystems not mounted in chroot
+
+`/proc`, `/sys`, `/dev`, `/dev/pts`, and `/run` were never bind-mounted into
+the chroot.  Without `/proc`, the `libc-bin` postinst (`ldconfig`) fails
+silently during the Docker CE apt install.  Every subsequent `chroot` call then
+fails with `arm-binfmt-P: Could not open '/lib/ld-linux-armhf.so.3'` because
+qemu-arm-static cannot load any ARM binary.
+
+**Fix:** Added `mount_chroot` / `umount_chroot` helpers and a `trap … EXIT` to
+guarantee cleanup.  `mount_chroot` is called once after the debootstrap second
+stage, before any configuration or package installation.
+
+**File changed:** `scripts/build-debian-rootfs.sh`.
+
+---
+
+### Fix 3: Yocto modules tarball broke the Debian usrmerge `/lib` symlink
+
+Debian trixie ships with `/lib → usr/lib` (usrmerge).  The Yocto modules
+tarball contains a top-level `lib/` directory entry.  When extracted with
+`tar -C ${SYSROOT}`, GNU tar replaces the `/lib` symlink with a real directory,
+making `/usr/lib/arm-linux-gnueabihf/ld-linux-armhf.so.3` unreachable.  This
+caused `depmod` and `chpasswd` to fail with the same
+`Could not open '/lib/ld-linux-armhf.so.3'` error as Fix 2 above.
+
+**Fix:** Extract the modules tarball into `${SYSROOT}/usr` instead of
+`${SYSROOT}` — `lib/modules/…` then lands at `usr/lib/modules/…` without
+touching the symlink.  Also fixed the `depmod` invocation to pass the kernel
+version string rather than the output of `ls`.
+
+**File changed:** `scripts/build-debian-rootfs.sh`.
+
+---
+
+### Fix 4: bmap file named incorrectly for bmaptool auto-discovery
+
+`assemble-sd-image.sh` was writing the bmap as `cubieboard4-debian13.img.bmap`
+but bmaptool auto-discovers the bmap by appending `.bmap` to the image filename
+passed on the command line.  When flashing the compressed image
+`cubieboard4-debian13.img.gz`, bmaptool looked for
+`cubieboard4-debian13.img.gz.bmap` and failed with
+`bmap file not found, please, use --nobmap option`.
+
+**Fix:** Changed the output filename to `${OUTPUT}.gz.bmap`.
+
+**File changed:** `scripts/assemble-sd-image.sh`.
+
 ## 2026-02-27 — Debian 13 image build with Docker CE and eMMC installer
 
 Added a full hybrid build system: Yocto builds the bootloader and kernel;

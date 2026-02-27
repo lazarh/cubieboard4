@@ -24,6 +24,24 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Must be run as root (debootstrap requires chroot)"
 
+mount_chroot() {
+    mount -t proc  proc     "${SYSROOT}/proc"
+    mount -t sysfs sysfs    "${SYSROOT}/sys"
+    mount --bind   /dev     "${SYSROOT}/dev"
+    mount --bind   /dev/pts "${SYSROOT}/dev/pts"
+    mount -t tmpfs tmpfs    "${SYSROOT}/run"
+}
+
+umount_chroot() {
+    umount "${SYSROOT}/run"     2>/dev/null || true
+    umount "${SYSROOT}/dev/pts" 2>/dev/null || true
+    umount "${SYSROOT}/dev"     2>/dev/null || true
+    umount "${SYSROOT}/sys"     2>/dev/null || true
+    umount "${SYSROOT}/proc"    2>/dev/null || true
+}
+
+trap umount_chroot EXIT
+
 command -v debootstrap   >/dev/null || die "debootstrap not found — run install-deps.sh"
 command -v qemu-arm-static >/dev/null || die "qemu-user-static not found — run install-deps.sh"
 
@@ -49,6 +67,9 @@ cp /usr/bin/qemu-arm-static "${SYSROOT}/usr/bin/"
 
 echo "==> Stage 2: debootstrap second stage inside chroot"
 chroot "${SYSROOT}" /debootstrap/debootstrap --second-stage
+
+# Mount virtual filesystems so chroot postinst scripts (ldconfig, systemd, etc.) work correctly
+mount_chroot
 
 # ── Configure the system inside chroot ─────────────────────────────────────
 
@@ -103,7 +124,7 @@ chroot "${SYSROOT}" apt-get install -y --no-install-recommends \
     vim-tiny less \
     util-linux e2fsprogs dosfstools parted \
     rsync wget curl \
-    nand-utils mtd-utils \
+    mtd-utils \
     kmod
 
 # ── Docker CE (armhf) ───────────────────────────────────────────────────────
@@ -134,9 +155,14 @@ echo "==> Installing kernel modules from Yocto..."
 MODULES_TGZ=$(ls "${YOCTO_DEPLOY}"/modules-*.tgz 2>/dev/null | sort -V | tail -1)
 if [[ -n "${MODULES_TGZ}" ]]; then
     echo "    Using ${MODULES_TGZ}"
-    tar -xzf "${MODULES_TGZ}" -C "${SYSROOT}" --strip-components=0
-    # modules tarball extracts to lib/modules/<kver>
-    chroot "${SYSROOT}" depmod -a "$(ls "${SYSROOT}/lib/modules/")" || true
+    # Debian trixie uses usrmerge (/lib -> usr/lib symlink).  Extracting the
+    # Yocto tarball (which has a top-level lib/ entry) directly into SYSROOT
+    # would replace that symlink with a real directory, breaking all ARM
+    # binary execution.  Extract into usr/ instead so lib/modules lands at
+    # the correct usr/lib/modules path without touching the symlink.
+    tar -xzf "${MODULES_TGZ}" -C "${SYSROOT}/usr" --strip-components=0
+    KVER=$(ls "${SYSROOT}/usr/lib/modules/")
+    chroot "${SYSROOT}" depmod -a "${KVER}" || true
 else
     echo "    WARNING: No modules tarball found in ${YOCTO_DEPLOY}"
     echo "    Run 'kas build kas.yml' first, then re-run this script."
