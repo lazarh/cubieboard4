@@ -168,7 +168,22 @@ else
     echo "    Run 'kas build kas.yml' first, then re-run this script."
 fi
 
-# ── eMMC installer ─────────────────────────────────────────────────────────
+# ── BCM4330 WiFi firmware NVRAM ─────────────────────────────────────────────
+# Debian's firmware-brcm80211 only ships a Prowise tablet NVRAM, not the
+# generic brcmfmac4330-sdio.txt that brcmfmac needs as a fallback.
+# Download the generic NVRAM from linux-firmware and add a board-specific
+# symlink so brcmfmac finds it automatically.
+
+echo "==> Fetching BCM4330 NVRAM from linux-firmware..."
+BRCM_DIR="${SYSROOT}/usr/lib/firmware/brcm"
+curl -fsSL \
+    "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/brcm/brcmfmac4330-sdio.txt" \
+    -o "${BRCM_DIR}/brcmfmac4330-sdio.txt"
+# Board-specific symlink: driver tries <board-compatible>.txt before the generic one
+ln -sf brcmfmac4330-sdio.txt \
+    "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.txt"
+
+
 
 echo "==> Embedding install-to-emmc.sh..."
 install -m 0755 "${SCRIPT_DIR}/install-to-emmc.sh" \

@@ -1,6 +1,15 @@
 --- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
 +++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
-@@ -159,11 +159,16 @@
+@@ -115,7 +115,8 @@
+ 	wifi_pwrseq: wifi-pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		clocks = <&ac100_rtc 1>;
+ 		clock-names = "ext_clock";
++		post-power-on-delay-ms = <200>;
+ 		/* enables internal regulator and de-asserts reset */
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
+ 	};
+@@ -159,11 +160,16 @@
  	pinctrl-names = "default";
  	pinctrl-0 = <&mmc1_pins>;
  	vmmc-supply = <&reg_dldo1>;
