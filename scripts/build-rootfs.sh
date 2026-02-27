@@ -9,6 +9,8 @@
 #
 # Environment variables:
 #   INSTALL_DOCKER=true   — also install Docker CE (default: false)
+#   WIFI_SSID=MyNetwork   — pre-configure WiFi (requires WIFI_PASSWORD)
+#   WIFI_PASSWORD=secret  — WPA2 passphrase for WIFI_SSID
 #
 # Produces: debian-rootfs/
 # Consumed by: scripts/assemble-sd-image.sh
@@ -21,6 +23,8 @@ SYSROOT="${REPO_ROOT}/debian-rootfs"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 INSTALL_DOCKER="${INSTALL_DOCKER:-false}"
+WIFI_SSID="${WIFI_SSID:-}"
+WIFI_PASSWORD="${WIFI_PASSWORD:-}"
 ARCH=armhf
 SUITE=trixie
 MIRROR=http://deb.debian.org/debian
@@ -208,6 +212,41 @@ fi
 echo "==> Setting root password to 'root' (change after first boot!)"
 echo "root:root" | chroot "${SYSROOT}" chpasswd
 
+# ── WiFi pre-configuration ──────────────────────────────────────────────────
+# Write a NetworkManager connection profile so the board connects on first boot.
+# Activate with: WIFI_SSID=MyNet WIFI_PASSWORD=secret sudo scripts/build-rootfs.sh
+
+if [[ -n "${WIFI_SSID}" && -n "${WIFI_PASSWORD}" ]]; then
+    echo "==> Pre-configuring WiFi for SSID: ${WIFI_SSID}"
+    NM_DIR="${SYSROOT}/etc/NetworkManager/system-connections"
+    mkdir -p "${NM_DIR}"
+    cat > "${NM_DIR}/wifi-preconfigured.nmconnection" <<EOF
+[connection]
+id=${WIFI_SSID}
+type=wifi
+autoconnect=true
+
+[wifi]
+ssid=${WIFI_SSID}
+mode=infrastructure
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=${WIFI_PASSWORD}
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=default
+method=auto
+EOF
+    chmod 600 "${NM_DIR}/wifi-preconfigured.nmconnection"
+    echo "    WiFi profile written (SSID: ${WIFI_SSID})."
+elif [[ -n "${WIFI_SSID}" || -n "${WIFI_PASSWORD}" ]]; then
+    echo "    WARNING: Both WIFI_SSID and WIFI_PASSWORD must be set to pre-configure WiFi. Skipping."
+fi
+
 # ── Cleanup ─────────────────────────────────────────────────────────────────
 
 rm -f "${SYSROOT}/usr/bin/qemu-arm-static"
@@ -217,4 +256,5 @@ rm -rf "${SYSROOT}/var/lib/apt/lists/"*
 echo ""
 echo "==> Debian 13 rootfs ready at: ${SYSROOT}"
 echo "    INSTALL_DOCKER was: ${INSTALL_DOCKER}"
+echo "    WIFI_SSID     was: ${WIFI_SSID:-<not set>}"
 echo "    Next step: sudo scripts/assemble-sd-image.sh"
