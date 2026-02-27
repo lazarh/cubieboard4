@@ -23,8 +23,7 @@ Builds a minimal **Debian 13 (trixie, armhf)** image for the CubieBoard4 (Allwin
 
 ```sh
 git clone https://github.com/lazarh/cubieboard4.git && cd cubieboard4
-pip install kas
-sudo bash install-deps.sh
+sudo bash install-deps.sh                 # installs deps + kas via pipx
 kas build kas.yml                         # build kernel + U-Boot (hours, first time)
 sudo bash scripts/build-debian-rootfs.sh  # bootstrap Debian 13 rootfs (needs internet)
 sudo bash scripts/assemble-sd-image.sh    # produce cubieboard4-debian13.img.gz
@@ -32,15 +31,15 @@ sudo bash scripts/assemble-sd-image.sh    # produce cubieboard4-debian13.img.gz
 
 ## Prerequisites
 
-Install `kas` and all host dependencies:
+Install all host dependencies (including `kas`) in one shot:
 
 ```sh
-pip install kas
 sudo bash install-deps.sh
 ```
 
-`install-deps.sh` installs Yocto build tools **plus** the debootstrap toolchain
-(`qemu-user-static`, `debootstrap`, `parted`, `dosfstools`, `rsync`).
+This installs Yocto build tools, the debootstrap toolchain
+(`qemu-user-static`, `debootstrap`, `parted`, `dosfstools`, `rsync`),
+and `kas` via `pipx` (safe on modern Debian/Ubuntu with PEP 668).
 
 Requires a **Debian/Ubuntu x86-64** build host with internet access.
 
