@@ -131,7 +131,15 @@ chroot "${SYSROOT}" apt-get install -y --no-install-recommends \
     util-linux e2fsprogs dosfstools parted \
     rsync wget curl \
     mtd-utils \
-    kmod
+    kmod iptables conntrack nftables
+
+# Ensure iptables uses the legacy backend so Docker can create legacy NAT chains
+# on kernels without nftables support; if the legacy alternative doesn't exist
+# the commands are no-ops.
+chroot "${SYSROOT}" update-alternatives --set iptables /usr/sbin/iptables-legacy 2>/dev/null || true
+chroot "${SYSROOT}" update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy 2>/dev/null || true
+chroot "${SYSROOT}" update-alternatives --set arptables /usr/sbin/arptables-legacy 2>/dev/null || true
+chroot "${SYSROOT}" update-alternatives --set ebtables /usr/sbin/ebtables-legacy 2>/dev/null || true
 
 # ── Docker CE (optional) ────────────────────────────────────────────────────
 
