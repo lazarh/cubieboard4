@@ -174,14 +174,20 @@ fi
 # module as on CubieBoard4). A generic brcmfmac4330-sdio.txt does not exist in
 # linux-firmware; add a board-specific symlink so brcmfmac finds it automatically.
 
-echo "==> Installing BCM4330 NVRAM symlink..."
+echo "==> Installing BCM4330 NVRAM and firmware symlinks..."
 BRCM_DIR="${SYSROOT}/usr/lib/firmware/brcm"
 mkdir -p "${BRCM_DIR}"
 if [[ -f "${BRCM_DIR}/brcmfmac4330-sdio.Prowise-PT301.txt" ]]; then
     # Driver looks up <board-compatible>.txt first; fall through to Prowise NVRAM.
     ln -sf brcmfmac4330-sdio.Prowise-PT301.txt \
         "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.txt"
-    echo "    BCM4330 NVRAM symlink installed (Prowise-PT301 → cubietech,a80-cubieboard4)."
+    # Also create board-specific aliases for the binary and blob files if present
+    for ext in bin clm_blob txcap_blob; do
+        if [[ -f "${BRCM_DIR}/brcmfmac4330-sdio.${ext}" ]]; then
+            ln -sf "brcmfmac4330-sdio.${ext}" "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.${ext}"
+        fi
+    done
+    echo "    BCM4330 firmware symlinks installed (Prowise-PT301 → cubietech,a80-cubieboard4)."
 else
     echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found — firmware-brcm80211 not installed?"
 fi
