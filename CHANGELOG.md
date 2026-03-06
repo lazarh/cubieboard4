@@ -4,6 +4,50 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-03-07
+
+### Fixed — eMMC boot failure after `install-to-emmc.sh`
+
+After installing to eMMC via `install-to-emmc.sh`, U-Boot loaded from eMMC but
+immediately failed with:
+
+```
+Loading Environment from FAT... ** Bad device specification mmc 1 **
+```
+
+Distro boot then fell through to PXE with no SD card or eMMC access, leaving the
+board unbootable from eMMC.
+
+Root cause: `mmc1` (the SDIO WiFi host, `mmc@1c10000`) was enabled in the U-Boot
+device tree. U-Boot's block device layer assigns devnums sequentially by DT scan
+order when no MMC aliases are defined. With all three MMC nodes enabled, the
+assignment was:
+
+| Node | Device | U-Boot devnum |
+|------|--------|---------------|
+| `mmc@1c0f000` | SD card | 0 |
+| `mmc@1c10000` | BCM4330 WiFi SDIO | **1** ← steals the eMMC slot |
+| `mmc@1c11000` | eMMC | 2 |
+
+`sunxi board.c` maps `BOOT_DEVICE_MMC2` (eMMC) → `mmc_get_env_dev()=1`, so
+U-Boot looked for the boot partition on "mmc 1" — which pointed to the WiFi chip,
+not the eMMC.
+
+Fix: disable `mmc1` in the U-Boot DTS. U-Boot does not need the WiFi chip, so
+removing it from the DM binding gives the correct devnum assignment
+(`mmc@1c0f000`→0, `mmc@1c11000`→1).
+
+- `patches/uboot/0002-dts-sun9i-a80-cubieboard4-disable-mmc1-wifi-in-uboot.patch`
+
+**To apply:** delete the U-Boot patch stamp and rebuild:
+```
+rm build/sources/u-boot-2024.01/.patched
+scripts/build-uboot.sh
+```
+Then rebuild the SD image, re-flash it, and re-run `install-to-emmc.sh` on the board.
+
+---
+
 ## 2026-03-06
 
 ### Fixed — Docker container start failure (`IPC_NS` / namespace unshare)

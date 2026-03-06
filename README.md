@@ -102,6 +102,34 @@ Source tarballs are downloaded to `build/sources/` on first run and reused on su
 
 ## Troubleshooting
 
+### eMMC boot fails — `Bad device specification mmc 1`
+
+If the board does not boot from eMMC after running `install-to-emmc.sh`, and
+U-Boot prints:
+
+```
+Loading Environment from FAT... ** Bad device specification mmc 1 **
+```
+
+the U-Boot binary on the eMMC was built before the fix in
+`patches/uboot/0002-dts-sun9i-a80-cubieboard4-disable-mmc1-wifi-in-uboot.patch`.
+The root cause is that U-Boot's WiFi SDIO node (`mmc@1c10000`) was enabled in the
+DTS, causing U-Boot to assign the eMMC to devnum 2 instead of the expected devnum 1.
+
+To fix:
+
+```bash
+# On the build host — rebuild U-Boot with the fix
+rm build/sources/u-boot-2024.01/.patched
+scripts/build-uboot.sh
+
+# Rebuild and reflash the SD image, then boot from SD
+scripts/assemble-sd-image.sh   # or scripts/build-image.sh if it exists
+
+# On the board (booted from SD) — reinstall to eMMC
+install-to-emmc.sh
+```
+
 ### WiFi (`wlan0`) missing after boot
 
 The BCM4330 SDIO chip is sensitive to power-up timing. If `wlan0` does not appear
