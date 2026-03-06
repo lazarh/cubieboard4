@@ -216,6 +216,14 @@ chroot "${SYSROOT}" systemctl enable ssh.service || true
 echo "==> Enabling systemd-timesyncd (NTP)..."
 chroot "${SYSROOT}" systemctl enable systemd-timesyncd.service || true
 
+# ── sysctl tweaks ───────────────────────────────────────────────────────────
+# vm.memfd_noexec=2 (default on some 6.x kernels) blocks runc/containerd from
+# calling memfd_create without MFD_EXEC, breaking Docker container startup.
+# Set to 0 so containers start normally.
+mkdir -p "${SYSROOT}/etc/sysctl.d"
+cat > "${SYSROOT}/etc/sysctl.d/90-docker.conf" <<'EOF'
+vm.memfd_noexec=0
+EOF
 
 # Ensure brcmfmac loads at boot regardless of udev modalias matching.
 
