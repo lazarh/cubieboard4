@@ -6,7 +6,7 @@ All notable changes to this project are documented here.
 
 ## 2026-03-07
 
-### Fixed — eMMC boot failure after `install-to-emmc.sh`
+### Fixed — eMMC boot failure after `install-to-emmc.sh` (three-part fix)
 
 After installing to eMMC via `install-to-emmc.sh`, U-Boot loaded from eMMC but
 immediately failed with:
@@ -18,10 +18,13 @@ Loading Environment from FAT... ** Bad device specification mmc 1 **
 Distro boot then fell through to PXE with no SD card or eMMC access, leaving the
 board unbootable from eMMC.
 
-Root cause: `mmc1` (the SDIO WiFi host, `mmc@1c10000`) was enabled in the U-Boot
-device tree. U-Boot's block device layer assigns devnums sequentially by DT scan
-order when no MMC aliases are defined. With all three MMC nodes enabled, the
-assignment was:
+Three root causes were identified and fixed:
+
+**Fix 1 — devnum collision (patch 0002)**
+
+`mmc1` (the SDIO WiFi host, `mmc@1c10000`) was enabled in the U-Boot device tree.
+U-Boot's block device layer assigns devnums sequentially by DT scan order when no
+MMC aliases are defined. With all three MMC nodes enabled, the assignment was:
 
 | Node | Device | U-Boot devnum |
 |------|--------|---------------|
@@ -39,7 +42,39 @@ removing it from the DM binding gives the correct devnum assignment
 
 - `patches/uboot/0002-dts-sun9i-a80-cubieboard4-disable-mmc1-wifi-in-uboot.patch`
 
-**To apply:** delete the U-Boot patch stamp and rebuild:
+**Fix 2 — A80 MMC reset entries used GATE() instead of RESET() (patch 0003)**
+
+`a80_mmc_resets[]` in `drivers/clk/sunxi/clk_a80.c` used the `GATE()` macro for
+all four entries. `GATE()` does not set the `CCU_RST_F_IS_VALID` flag, so
+`reset_deassert()` silently did nothing, printing:
+
+```
+sunxi_set_reset: (RST#N) unhandled
+```
+
+This meant the mmc-common module reset was never deasserted by the DM driver.
+Fix: change all four entries from `GATE()` to `RESET()`.
+
+- `patches/uboot/0003-clk-sunxi-a80-Fix-mmc-reset-entries-use-RESET-not-GATE.patch`
+
+**Fix 3 — Clock output disabled after controller reset (patch 0004)**
+
+After `sunxi_mmc_probe()` issues `SUNXI_MMC_GCTRL_RESET`, all controller registers
+(including `CLKCR`) are reset to hardware defaults. `CLKCR.CLK_ENABLE` resets to 0,
+disabling clock output to the card.
+
+`mmc_set_initial_state()` calls `mmc_set_clock(mmc, 0, ...)`, which causes
+`sunxi_mmc_set_ios_common()` to skip `mmc_config_clock()` entirely (guarded by
+`if (mmc->clock && ...)`), leaving `CLKCR` with `CLK_ENABLE = 0`.
+
+Without the clock enabled, the hardware cannot generate the 80 init CLK pulses
+required for CMD0 (`SEND_INIT_SEQ`), and no subsequent commands ever reach the
+eMMC card. Fix: after the controller reset in probe, explicitly set `CLK_ENABLE`
+in `CLKCR` and call `mmc_update_clk()` to latch the configuration.
+
+- `patches/uboot/0004-mmc-sunxi-Enable-clock-after-controller-reset-in-probe.patch`
+
+**To apply all fixes:** delete the U-Boot patch stamp and rebuild:
 ```
 rm build/sources/u-boot-2024.01/.patched
 scripts/build-uboot.sh

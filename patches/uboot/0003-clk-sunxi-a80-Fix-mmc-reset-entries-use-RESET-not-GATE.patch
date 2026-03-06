@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Sat, 07 Mar 2026 00:00:00 +0000
+Subject: [PATCH] clk: sunxi: a80: Fix MMC reset entries to use RESET() not GATE()
+
+The a80_mmc_resets[] array incorrectly used the GATE() macro instead of
+RESET(). The GATE() macro does not set the CCU_RST_F_IS_VALID flag, so
+reset_deassert() silently does nothing ("unhandled") for all four MMC
+controller resets.
+
+This means the mmc_config_clk (mmc-common) reset signal for each MMC
+controller is never deasserted by the DM driver, causing U-Boot proper
+to print:
+  sunxi_set_reset: (RST#N) unhandled
+
+Fix all four entries to use RESET() so the hardware reset registers are
+correctly written during probe.
+
+Signed-off-by: Copilot <copilot@github.com>
+---
+ drivers/clk/sunxi/clk_a80.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/sunxi/clk_a80.c b/drivers/clk/sunxi/clk_a80.c
+index 1111111..2222222 100644
+--- a/drivers/clk/sunxi/clk_a80.c
++++ b/drivers/clk/sunxi/clk_a80.c
+@@ -77,10 +77,10 @@ static const struct ccu_clk_gate a80_mmc_gates[] = {
+ };
+ 
+ static const struct ccu_reset a80_mmc_resets[] = {
+-	[0]			= GATE(0x0, BIT(18)),
+-	[1]			= GATE(0x4, BIT(18)),
+-	[2]			= GATE(0x8, BIT(18)),
+-	[3]			= GATE(0xc, BIT(18)),
++	[0]			= RESET(0x0, BIT(18)),
++	[1]			= RESET(0x4, BIT(18)),
++	[2]			= RESET(0x8, BIT(18)),
++	[3]			= RESET(0xc, BIT(18)),
+ };
+ 
+ const struct ccu_desc a80_ccu_desc = {

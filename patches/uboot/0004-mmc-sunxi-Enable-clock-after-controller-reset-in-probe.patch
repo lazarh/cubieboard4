@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Sat, 07 Mar 2026 00:00:00 +0000
+Subject: [PATCH] mmc: sunxi: Enable clock output after controller reset in probe
+
+After sunxi_mmc_probe() issues SUNXI_MMC_GCTRL_RESET, all controller
+registers (including CLKCR) are reset to their hardware defaults.
+CLKCR.CLK_ENABLE resets to 0, disabling clock output to the card.
+
+The subsequent mmc_start_init() call goes through mmc_set_initial_state()
+which calls mmc_set_clock(mmc, 0, MMC_CLK_ENABLE). Because mmc->clock is
+0, sunxi_mmc_set_ios_common() skips the mmc_config_clock() call entirely,
+leaving CLKCR with CLK_ENABLE = 0.
+
+Without the clock enabled, the hardware cannot generate the 80 init CLK
+pulses required for CMD0 (SEND_INIT_SEQ), and no subsequent commands
+ever reach the card. This manifests as mmc_init() failing silently for
+the eMMC (mmc@1c11000) when booting from eMMC on Cubieboard4 / sun9i A80.
+
+Fix this by explicitly setting CLK_ENABLE in CLKCR and calling
+mmc_update_clk() immediately after the controller reset in the DM probe
+path. This ensures the card clock is running at the module clock rate
+(24 MHz) before the MMC core starts the card initialization sequence.
+
+The module clock itself (CCU sd2_clk_cfg) is unaffected by the
+controller reset, so it retains the 24 MHz configuration written by the
+preceding mmc_set_mod_clk() call.
+
+Signed-off-by: Copilot <copilot@github.com>
+---
+ drivers/mmc/sunxi_mmc.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/sunxi_mmc.c b/drivers/mmc/sunxi_mmc.c
+index 3333333..4444444 100644
+--- a/drivers/mmc/sunxi_mmc.c
++++ b/drivers/mmc/sunxi_mmc.c
+@@ -688,7 +688,19 @@ static int sunxi_mmc_probe(struct udevice *dev)
+ 	/* Reset controller */
+ 	writel(SUNXI_MMC_GCTRL_RESET, &priv->reg->gctrl);
+ 	udelay(1000);
+ 
++	/*
++	 * Enable clock output to the card after the controller reset.
++	 * mmc_set_initial_state() sets mmc->clock = 0, which causes
++	 * sunxi_mmc_set_ios_common() to skip mmc_config_clock(), leaving
++	 * CLKCR with its reset value (CLK_ENABLE = 0). Without the clock
++	 * enabled, the hardware cannot generate the 80 init CLK pulses for
++	 * CMD0 (SEND_INIT_SEQ) and subsequent commands never reach the card.
++	 */
++	setbits_le32(&priv->reg->clkcr, SUNXI_MMC_CLK_ENABLE);
++	mmc_update_clk(priv);
++
+ 	return 0;
+ }

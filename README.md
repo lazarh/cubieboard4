@@ -111,20 +111,31 @@ U-Boot prints:
 Loading Environment from FAT... ** Bad device specification mmc 1 **
 ```
 
-the U-Boot binary on the eMMC was built before the fix in
-`patches/uboot/0002-dts-sun9i-a80-cubieboard4-disable-mmc1-wifi-in-uboot.patch`.
-The root cause is that U-Boot's WiFi SDIO node (`mmc@1c10000`) was enabled in the
-DTS, causing U-Boot to assign the eMMC to devnum 2 instead of the expected devnum 1.
+the U-Boot binary on the eMMC was built before the three fixes in patches 0002–0004.
+There are three root causes that must all be fixed together:
 
-To fix:
+1. **Devnum collision** (patch 0002): The WiFi SDIO node (`mmc@1c10000`) was enabled
+   in the U-Boot DTS, stealing devnum 1 from the eMMC (which U-Boot expects at devnum 1).
+   Fix: disable `mmc@1c10000` in the U-Boot DTS.
+
+2. **MMC reset not deasserted** (patch 0003): `a80_mmc_resets[]` in `clk_a80.c` used
+   `GATE()` instead of `RESET()`, silently preventing the mmc-common reset from being
+   deasserted. U-Boot would print `sunxi_set_reset: (RST#N) unhandled` for each MMC.
+
+3. **Clock output disabled after reset** (patch 0004): After `SUNXI_MMC_GCTRL_RESET`
+   in probe, `CLKCR.CLK_ENABLE` resets to 0. The MMC core then calls
+   `mmc_set_clock(mmc, 0, ...)`, which skips `mmc_config_clock()`, leaving the clock
+   disabled. The eMMC never receives CLK pulses and does not respond to CMD0/CMD1.
+
+To fix, rebuild U-Boot (which applies all three patches) and reinstall:
 
 ```bash
-# On the build host — rebuild U-Boot with the fix
+# On the build host — rebuild U-Boot with all fixes
 rm build/sources/u-boot-2024.01/.patched
 scripts/build-uboot.sh
 
 # Rebuild and reflash the SD image, then boot from SD
-scripts/assemble-sd-image.sh   # or scripts/build-image.sh if it exists
+sudo scripts/assemble-sd-image.sh
 
 # On the board (booted from SD) — reinstall to eMMC
 install-to-emmc.sh
