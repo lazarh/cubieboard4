@@ -102,6 +102,19 @@ Source tarballs are downloaded to `build/sources/` on first run and reused on su
 
 ## Troubleshooting
 
+### WiFi (`wlan0`) missing after boot
+
+The BCM4330 SDIO chip is sensitive to power-up timing. If `wlan0` does not appear
+in `ip a`, simply reboot — the chip usually initialises correctly on the next attempt.
+The DTS is configured with a 500 ms reset hold delay and a 25 MHz SDIO clock cap to
+minimise the occurrence of this.
+
+### Spurious `brcmf_fweh_event_worker: event handler failed (72)` messages
+
+The BCM4330 firmware sends event type 72 (`FIFO_CREDIT_MAP`) which the brcmfmac
+driver does not register a handler for. These messages are cosmetic and do not
+indicate a problem with WiFi operation.
+
 ### U-Boot build fails with SWIG / pylibfdt error
 
 Symptom: build fails with errors like

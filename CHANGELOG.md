@@ -4,6 +4,56 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-03-06
+
+### Fixed — Docker container start failure (`IPC_NS` / namespace unshare)
+
+Docker and `runc` containers failed to start with `EINVAL` from namespace unshare.
+Root cause: `CONFIG_IPC_NS` was silently dropped by kconfig because its dependencies
+(`CONFIG_SYSVIPC` or `CONFIG_POSIX_MQUEUE`) were both disabled by `sunxi_defconfig`.
+
+- **`b0605d0`** — `configs/kernel/cubieboard4.config`: add `CONFIG_SYSVIPC=y`,
+  `CONFIG_POSIX_MQUEUE=y` (IPC_NS dependencies), `CONFIG_IPC_NS=y`, `CONFIG_CGROUP_NS=y`,
+  `CONFIG_CPUSETS=y`.
+
+### Fixed — Docker cgroup v2 BPF device filter (`bpf_prog_query` not implemented)
+
+Containers failed with `bpf_prog_query(BPF_CGROUP_DEVICE) failed: function not implemented`.
+Root cause: `CONFIG_BPF_SYSCALL` was explicitly disabled in `sunxi_defconfig`, which
+also blocked `CONFIG_CGROUP_BPF`. Docker/runc requires `bpf()` syscall for cgroup v2
+device access control.
+
+- **`932894b`** — `configs/kernel/cubieboard4.config`: add `CONFIG_BPF_SYSCALL=y`,
+  `CONFIG_CGROUP_BPF=y`.
+
+### Fixed — kernel BUG in `register_netdevice` causing WiFi crash and `ip a` hang
+
+The BCM4330 driver crashed at boot with `kernel BUG at net/core/dev.c:10174`
+(`BUG_ON(dev->reg_state != NETREG_UNINITIALIZED)`). A firmware `E_IF` event fired
+concurrently with `brcmf_net_attach()`, causing the network device to be registered
+twice. After the BUG the RTNL lock was never released, hanging any command that needs
+it (`ip a`, `ip link`, etc.).
+
+Fix: change the `!locked` path in `brcmf_net_attach()` to use
+`cfg80211_register_netdevice()` with `rtnl_lock` + `wiphy_lock` held, which sets
+`wdev->registered = true` before `register_netdevice()` runs and prevents the race.
+
+- **`ecf9a5d`** — `patches/kernel/0002-brcmfmac-fix-netdev-registration-via-cfg80211-path.patch`
+
+### Fixed — BCM4330 intermittent SDIO init failure at boot
+
+The BCM4330 WiFi chip occasionally failed to initialize on boot
+(`mmc1: Failed to initialize a non-removable card`, multiple
+`sunxi-mmc 1c10000.mmc: fatal err update clk timeout`). The SDIO bus was running
+at its default 50 MHz which is unreliable on this hardware, and the power-on reset
+delay was too short.
+
+- **`4250200`** — `patches/kernel/0001-dts-sun9i-a80-cubieboard4-fix-wifi-pwrseq-delay.patch`:
+  increase `post-power-on-delay-ms` from 200 ms to 500 ms; add
+  `max-frequency = <25000000>` to the `mmc1` node to cap SDIO clock at 25 MHz.
+
+---
+
 ## 2026-02-27
 
 ### Added
