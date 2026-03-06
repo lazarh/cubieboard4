@@ -1,0 +1,78 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Copilot <223556219+Copilot@users.noreply.github.com>
+Date: Fri, 06 Mar 2026 11:53:00 +0000
+Subject: [PATCH] wifi: brcmfmac: fix netdev registration after wiphy_register
+
+brcmf_net_attach() with locked=false calls register_netdev(), which
+acquires only rtnl_lock.  After brcmf_cfg80211_attach() has called
+wiphy_register(), every netdev with ieee80211_ptr set must be registered
+through cfg80211_register_netdevice() so that wdev->registered is set
+to true *before* register_netdevice() runs.  This suppresses the
+NETDEV_REGISTER notifier's cfg80211_register_wdev() path (which requires
+wiphy_lock) and prevents a race where the wdev can end up partially
+registered.
+
+On BCM4330 SDIO (AP6330 / Cubieboard4) the race is reliably hit at
+boot: brcmf_fweh_activate_events() is called inside
+brcmf_cfg80211_attach(), and a firmware E_IF event can fire and call
+brcmf_net_attach() concurrently.  The second brcmf_net_attach() then
+calls register_netdev() on an already-registered ndev, triggering
+
+  kernel BUG at net/core/dev.c:10174
+  BUG_ON(dev->reg_state != NETREG_UNINITIALIZED)
+
+This also permanently deadlocks rtnl_lock, causing any subsequent
+`ip a` / `ip link` to hang.
+
+Fix: when locked=false acquire rtnl_lock + wiphy_lock and always call
+cfg80211_register_netdevice(), matching the expected locking contract
+for cfg80211-backed interfaces.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+---
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c	2026-03-06 13:13:24.384412308 +0200
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c	2026-03-06 13:14:26.367664639 +0200
+@@ -638,12 +638,14 @@
+ int brcmf_net_attach(struct brcmf_if *ifp, bool locked)
+ {
+ 	struct brcmf_pub *drvr = ifp->drvr;
++	struct wiphy *wiphy;
+ 	struct net_device *ndev;
+ 	s32 err;
+ 
+ 	brcmf_dbg(TRACE, "Enter, bsscfgidx=%d mac=%pM\n", ifp->bsscfgidx,
+ 		  ifp->mac_addr);
+ 	ndev = ifp->ndev;
++	wiphy = cfg_to_wiphy(drvr->config);
+ 
+ 	/* set appropriate operations */
+ 	ndev->netdev_ops = &brcmf_netdev_ops_pri;
+@@ -658,10 +660,24 @@
+ 	INIT_WORK(&ifp->multicast_work, _brcmf_set_multicast_list);
+ 	INIT_WORK(&ifp->ndoffload_work, _brcmf_update_ndtable);
+ 
+-	if (locked)
+-		err = cfg80211_register_netdevice(ndev);
+-	else
+-		err = register_netdev(ndev);
++	/*
++	 * After wiphy_register() the ndev has ieee80211_ptr set. All
++	 * registration must go through cfg80211_register_netdevice() so
++	 * that wdev->registered is marked true before register_netdevice()
++	 * runs, preventing the NETDEV_REGISTER notifier from calling
++	 * cfg80211_register_wdev() without wiphy_lock held (which can
++	 * race and leave the device in a broken state, causing a kernel
++	 * BUG at net/core/dev.c: reg_state != NETREG_UNINITIALIZED).
++	 */
++	if (!locked) {
++		rtnl_lock();
++		wiphy_lock(wiphy);
++	}
++	err = cfg80211_register_netdevice(ndev);
++	if (!locked) {
++		wiphy_unlock(wiphy);
++		rtnl_unlock();
++	}
+ 	if (err != 0) {
+ 		bphy_err(drvr, "couldn't register the net device\n");
+ 		goto fail;
