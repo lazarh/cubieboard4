@@ -1,8 +1,36 @@
---- a/drivers/mmc/host/sunxi-mmc.c	2025-03-28 22:59:57.000000000 +0200
-+++ b/drivers/mmc/host/sunxi-mmc.c	2026-03-07 07:00:00.000000000 +0200
+From: CubieBoard4 Build System <build@cubieboard4>
+Date: Fri, 7 Mar 2026 07:00:00 +0200
+Subject: [PATCH 3/3] mmc: sunxi: add mask_data0 to sun9i_a80_cfg
+
+Fix BCM4330 SDIO initialisation failure on the Allwinner A80 by
+setting mask_data0 = true in sun9i_a80_cfg.
+
+sunxi_mmc_oclk_onoff() issues SDXC_UPCLK_ONLY | SDXC_WAIT_PRE_OVER
+to update the MMC clock. WAIT_PRE_OVER waits for DATA0 to go high
+(no card busy) before completing. While the BCM4330 is held in
+reset or has not yet responded, DATA0 is stuck low. Without
+mask_data0, every clock update times out after ~750 ms and sets
+priv->fatal_err = 1, permanently preventing card initialisation.
+
+When mask_data0 = true the driver sets SDXC_MASK_DATA0 (CLKCR
+bit 31) before issuing the clock-only update, instructing the
+hardware to ignore the DATA0 line. Clock updates complete
+immediately, BCM4330 initialises normally, and wlan0 appears.
+
+All other recent SoC configs (sun50i_a64, sun20i_d1, sun50i_h616)
+already had mask_data0 = true. The sun9i_a80_cfg was the only one
+missing it.
+
+Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
+---
+ drivers/mmc/host/sunxi-mmc.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/mmc/host/sunxi-mmc.c2025-03-28 22:59:57.000000000 +0200
++++ b/drivers/mmc/host/sunxi-mmc.c2026-03-07 07:00:00.000000000 +0200
 @@ -1165,6 +1165,7 @@ static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = sun9i_mmc_clk_delays,
- 	.can_calibrate = false,
-+	.mask_data0 = true,
+ .idma_des_size_bits = 16,
+ .clk_delays = sun9i_mmc_clk_delays,
+ .can_calibrate = false,
++.mask_data0 = true,
  };

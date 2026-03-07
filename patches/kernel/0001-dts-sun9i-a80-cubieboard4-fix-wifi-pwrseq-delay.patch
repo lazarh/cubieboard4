@@ -1,18 +1,39 @@
---- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts	2025-03-28 22:59:57.000000000 +0200
-+++ arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts	2026-03-06 14:18:45.483031984 +0200
+From: CubieBoard4 Build System <build@cubieboard4>
+Date: Thu, 6 Mar 2026 14:18:45 +0200
+Subject: [PATCH 1/3] dts: sun9i-a80-cb4: set WiFi pwrseq timing limits
+
+Add post-power-on-delay-ms and cap max-frequency on the BCM4330
+SDIO node to improve initialisation reliability.
+
+The BCM4330 (AP6330) requires time after its reset line is released
+before it can respond to SDIO commands. Without a delay the host
+may attempt card enumeration before the chip is ready. A 1000 ms
+post-power-on delay in the pwrseq-simple node ensures the chip is
+stable before the first SDIO command is issued.
+
+Capping max-frequency at 25 MHz keeps the SDIO clock within the
+range tested to work reliably with the BCM4330 on this board.
+
+Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
+---
+ arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts2025-03-28 22:59:57.000000000 +0200
++++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts2026-03-06 14:18:45.483031984 +0200
 @@ -116,6 +116,7 @@
- 		compatible = "mmc-pwrseq-simple";
- 		clocks = <&ac100_rtc 1>;
- 		clock-names = "ext_clock";
-+		post-power-on-delay-ms = <1000>;
- 		/* enables internal regulator and de-asserts reset */
- 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
- 	};
+ compatible = "mmc-pwrseq-simple";
+ clocks = <&ac100_rtc 1>;
+ clock-names = "ext_clock";
++post-power-on-delay-ms = <1000>;
+ /* enables internal regulator and de-asserts reset */
+ reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
+ };
 @@ -162,6 +163,7 @@
- 	vqmmc-supply = <&reg_cldo3>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
- 	bus-width = <4>;
-+	max-frequency = <25000000>;
- 	non-removable;
- 	status = "okay";
+ vqmmc-supply = <&reg_cldo3>;
+ mmc-pwrseq = <&wifi_pwrseq>;
+ bus-width = <4>;
++max-frequency = <25000000>;
+ non-removable;
+ status = "okay";
  };
