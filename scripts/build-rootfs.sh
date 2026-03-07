@@ -9,6 +9,7 @@
 #
 # Environment variables:
 #   INSTALL_DOCKER=true   — also install Docker CE (default: false)
+#   HOSTNAME=myboard      — set board hostname (default: cubieboard4)
 #   WIFI_SSID=MyNetwork   — pre-configure WiFi (requires WIFI_PASSWORD)
 #   WIFI_PASSWORD=secret  — WPA2 passphrase for WIFI_SSID
 #
@@ -23,6 +24,7 @@ SYSROOT="${REPO_ROOT}/debian-rootfs"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 INSTALL_DOCKER="${INSTALL_DOCKER:-false}"
+HOSTNAME="${HOSTNAME:-cubieboard4}"
 WIFI_SSID="${WIFI_SSID:-}"
 WIFI_PASSWORD="${WIFI_PASSWORD:-}"
 ARCH=armhf
@@ -94,10 +96,10 @@ deb ${MIRROR} ${SUITE}-updates main contrib non-free non-free-firmware
 deb http://security.debian.org/debian-security ${SUITE}-security main contrib non-free non-free-firmware
 EOF
 
-echo "cubieboard4" > "${SYSROOT}/etc/hostname"
+echo "${HOSTNAME}" > "${SYSROOT}/etc/hostname"
 cat > "${SYSROOT}/etc/hosts" <<EOF
 127.0.0.1  localhost
-127.0.1.1  cubieboard4
+127.0.1.1  ${HOSTNAME}
 ::1        localhost ip6-localhost ip6-loopback
 EOF
 
@@ -307,5 +309,6 @@ rm -rf "${SYSROOT}/var/lib/apt/lists/"*
 echo ""
 echo "==> Debian 13 rootfs ready at: ${SYSROOT}"
 echo "    INSTALL_DOCKER was: ${INSTALL_DOCKER}"
-echo "    WIFI_SSID     was: ${WIFI_SSID:-<not set>}"
+echo "    HOSTNAME       was: ${HOSTNAME}"
+echo "    WIFI_SSID      was: ${WIFI_SSID:-<not set>}"
 echo "    Next step: sudo scripts/assemble-sd-image.sh"
