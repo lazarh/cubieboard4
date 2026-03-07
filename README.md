@@ -111,8 +111,8 @@ U-Boot prints:
 Loading Environment from FAT... ** Bad device specification mmc 1 **
 ```
 
-the U-Boot binary on the eMMC was built before the three fixes in patches 0002–0004.
-There are three root causes that must all be fixed together:
+the U-Boot binary on the eMMC was built before the fixes in patches 0002–0005.
+Four root causes must all be fixed together:
 
 1. **Devnum collision** (patch 0002): The WiFi SDIO node (`mmc@1c10000`) was enabled
    in the U-Boot DTS, stealing devnum 1 from the eMMC (which U-Boot expects at devnum 1).
@@ -122,12 +122,18 @@ There are three root causes that must all be fixed together:
    `GATE()` instead of `RESET()`, silently preventing the mmc-common reset from being
    deasserted. U-Boot would print `sunxi_set_reset: (RST#N) unhandled` for each MMC.
 
-3. **Clock output disabled after reset** (patch 0004): After `SUNXI_MMC_GCTRL_RESET`
-   in probe, `CLKCR.CLK_ENABLE` resets to 0. The MMC core then calls
-   `mmc_set_clock(mmc, 0, ...)`, which skips `mmc_config_clock()`, leaving the clock
-   disabled. The eMMC never receives CLK pulses and does not respond to CMD0/CMD1.
+3. **Wrong config symbol in get_mclk_offset()** (patch 0005): `sunxi_mmc.c` tested
+   `IS_ENABLED(CONFIG_MACH_SUN9I_A80)` (non-existent symbol) instead of
+   `CONFIG_MACH_SUN9I`, causing `priv->mclkreg` to point at reserved CCU space
+   (`0x06000090`) instead of the correct sd2_clk_cfg register (`0x06000418`).
+   All module-clock writes were silently dropped, producing undefined init behaviour.
 
-To fix, rebuild U-Boot (which applies all three patches) and reinstall:
+4. **Clock output disabled after reset** (patch 0004): After `SUNXI_MMC_GCTRL_RESET`
+   in probe, `CLKCR.CLK_ENABLE` resets to 0. The first `mmc_update_clk(WAIT_PRE_OVER)`
+   inside `mmc_config_clock()` then hangs 2 s (CLK never driven) and sets
+   `priv->fatal_err = 1`, making the eMMC permanently inaccessible.
+
+To fix, rebuild U-Boot (which applies all patches) and reinstall:
 
 ```bash
 # On the build host — rebuild U-Boot with all fixes

@@ -6,7 +6,7 @@ All notable changes to this project are documented here.
 
 ## 2026-03-07
 
-### Fixed — eMMC boot failure after `install-to-emmc.sh` (three-part fix)
+### Fixed — eMMC boot failure after `install-to-emmc.sh` (five-part fix)
 
 After installing to eMMC via `install-to-emmc.sh`, U-Boot loaded from eMMC but
 immediately failed with:
@@ -18,7 +18,7 @@ Loading Environment from FAT... ** Bad device specification mmc 1 **
 Distro boot then fell through to PXE with no SD card or eMMC access, leaving the
 board unbootable from eMMC.
 
-Three root causes were identified and fixed:
+Five root causes were identified and fixed (patches 0002–0005):
 
 **Fix 1 — devnum collision (patch 0002)**
 
@@ -57,22 +57,49 @@ Fix: change all four entries from `GATE()` to `RESET()`.
 
 - `patches/uboot/0003-clk-sunxi-a80-Fix-mmc-reset-entries-use-RESET-not-GATE.patch`
 
-**Fix 3 — Clock output disabled after controller reset (patch 0004)**
+**Fix 3 — Wrong config symbol in get_mclk_offset() (patch 0005)**
 
-After `sunxi_mmc_probe()` issues `SUNXI_MMC_GCTRL_RESET`, all controller registers
-(including `CLKCR`) are reset to hardware defaults. `CLKCR.CLK_ENABLE` resets to 0,
-disabling clock output to the card.
+`get_mclk_offset()` in `drivers/mmc/sunxi_mmc.c` uses
+`IS_ENABLED(CONFIG_MACH_SUN9I_A80)` to detect the A80 SoC, but
+`CONFIG_MACH_SUN9I_A80` does not exist anywhere in U-Boot 2024.01. The correct
+symbol is `CONFIG_MACH_SUN9I`.
 
-`mmc_set_initial_state()` calls `mmc_set_clock(mmc, 0, ...)`, which causes
-`sunxi_mmc_set_ios_common()` to skip `mmc_config_clock()` entirely (guarded by
-`if (mmc->clock && ...)`), leaving `CLKCR` with `CLK_ENABLE = 0`.
+Because the condition was never true, `get_mclk_offset()` always returned `0x88`
+instead of `0x410`, causing `priv->mclkreg` to be computed as:
 
-Without the clock enabled, the hardware cannot generate the 80 init CLK pulses
-required for CMD0 (`SEND_INIT_SEQ`), and no subsequent commands ever reach the
-eMMC card. Fix: after the controller reset in probe, explicitly set `CLK_ENABLE`
-in `CLKCR` and call `mmc_update_clk()` to latch the configuration.
+- Wrong:   `0x06000000 + 0x88 + 8 = 0x06000090` (reserved CCU space)
+- Correct: `0x06000000 + 0x410 + 8 = 0x06000418` (sd2_clk_cfg)
+
+Every `mmc_set_mod_clk()` call silently wrote the clock-select/divider value to
+reserved CCU space. The sd2_clk_cfg register retaining the 24 MHz value set by
+SPL, the CLKCR divider was programmed for 400 kHz but the module clock feeding
+the controller stayed at 24 MHz, producing undefined initialization behaviour.
+
+Fix: change `CONFIG_MACH_SUN9I_A80` → `CONFIG_MACH_SUN9I`.
+
+- `patches/uboot/0005-mmc-sunxi-Fix-get_mclk_offset-for-sun9i-A80.patch`
+
+**Fix 4 — Clock output disabled after controller reset (patch 0004)**
+
+After `sunxi_mmc_probe()` issues `SUNXI_MMC_GCTRL_RESET`, `CLKCR` is zeroed so
+`CLK_ENABLE = 0`. `mmc_set_initial_state()` clamps `mmc->clock = 0` to `f_min`
+(400 kHz) and calls `mmc_config_clock()`, which first disables the clock and
+calls `mmc_update_clk(WAIT_PRE_OVER)`. Because `CLK_ENABLE` is still 0 the
+controller never drives CLK, `WAIT_PRE_OVER` never resolves, the command times
+out after 2 s, and `priv->fatal_err = 1` makes the device permanently unusable.
+
+Fix: after the controller reset in probe, set `CLKCR.CLK_ENABLE = 1` so the
+subsequent `mmc_update_clk(WAIT_PRE_OVER)` inside `mmc_config_clock()` can
+complete. We do **not** call `mmc_update_clk()` in probe itself to avoid
+`WAIT_PRE_OVER` on a just-reset controller.
 
 - `patches/uboot/0004-mmc-sunxi-Enable-clock-after-controller-reset-in-probe.patch`
+
+**Fix 5 — Silent failures made visible (patch 0005, combined)**
+
+`mmc_rint_wait()` and `mmc_blk_probe()` used `debug()` for error paths, so eMMC
+initialization failures produced no output at the default log level. Changed to
+`pr_err()` so any future failures are immediately visible on the serial console.
 
 **To apply all fixes:** delete the U-Boot patch stamp and rebuild:
 ```

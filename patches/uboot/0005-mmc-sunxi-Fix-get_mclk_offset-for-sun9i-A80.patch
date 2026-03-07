@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Sat, 07 Mar 2026 00:00:00 +0000
+Subject: [PATCH] mmc: sunxi: Fix get_mclk_offset() for sun9i A80
+
+get_mclk_offset() uses IS_ENABLED(CONFIG_MACH_SUN9I_A80) to detect the
+A80 SoC, but CONFIG_MACH_SUN9I_A80 does not exist anywhere in U-Boot
+2024.01.  The correct Kconfig symbol for the Allwinner A80 (sun9i) is
+CONFIG_MACH_SUN9I, which is defined in arch/arm/mach-sunxi/Kconfig.
+
+Because the condition is never true, get_mclk_offset() always falls
+through to the default return value (0x88), causing priv->mclkreg to be
+computed as CCU_base + 0x88 + mmc_no*4 instead of the correct
+CCU_base + 0x410 + mmc_no*4.
+
+For eMMC (mmc2):
+  Wrong:   0x06000000 + 0x88 + 8 = 0x06000090  (reserved CCU space)
+  Correct: 0x06000000 + 0x410 + 8 = 0x06000418 (sd2_clk_cfg)
+
+Every mmc_set_mod_clk() call writes the clock-select/divider value to
+the wrong address (a no-op on reserved CCU space), leaving sd2_clk_cfg
+unchanged at 24 MHz.  The clock dividers in CLKCR are reprogrammed for
+400 kHz, but the module clock driving the controller stays at 24 MHz,
+so the card actually sees 24 MHz during the initialization sequence.
+
+More critically: because the sd2_clk_cfg register is never written, the
+verify-then-re-enable sequence in mmc_config_clock() calls mmc_update_clk()
+in the wrong controller state, causing the eMMC initialization to fail
+entirely on sun9i A80 Cubieboard4 with "** Bad device specification mmc 1 **".
+
+Also change mmc_rint_wait() and mmc_blk_probe() error paths from debug()
+to pr_err() so initialization failures are visible on the serial console
+at the default log level.
+
+Signed-off-by: Copilot <copilot@github.com>
+---
+ drivers/mmc/mmc-uclass.c |  2 +-
+ drivers/mmc/sunxi_mmc.c  |  8 +++++---
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mmc/mmc-uclass.c b/drivers/mmc/mmc-uclass.c
+index 3333333..4444444 100644
+--- a/drivers/mmc/mmc-uclass.c
++++ b/drivers/mmc/mmc-uclass.c
+@@ -487,7 +487,7 @@ static int mmc_blk_probe(struct udevice *dev)
+ 	ret = mmc_init(mmc);
+ 	if (ret) {
+-		debug("%s: mmc_init() failed (err=%d)\n", __func__, ret);
++		pr_err("%s: mmc_init() failed (err=%d)\n", __func__, ret);
+ 		return ret;
+ 	}
+ 
+diff --git a/drivers/mmc/sunxi_mmc.c b/drivers/mmc/sunxi_mmc.c
+index 3333333..4444444 100644
+--- a/drivers/mmc/sunxi_mmc.c
++++ b/drivers/mmc/sunxi_mmc.c
+@@ -303,9 +303,11 @@ static int mmc_rint_wait(struct sunxi_mmc_priv *priv, struct mmc *mmc,
+ 		if ((get_timer(start) > timeout_msecs) ||
+ 		    (status & SUNXI_MMC_RINT_INTERRUPT_ERROR_BIT)) {
+-			debug("%s timeout %x\n", what,
+-			      status & SUNXI_MMC_RINT_INTERRUPT_ERROR_BIT);
++			pr_err("%s timeout rint=0x%x err=0x%x\n", what,
++			       status,
++			       status & SUNXI_MMC_RINT_INTERRUPT_ERROR_BIT);
+ 			return -ETIMEDOUT;
+ 		}
+ 
+@@ -621,7 +623,7 @@ static unsigned get_mclk_offset(void)
+ {
+-	if (IS_ENABLED(CONFIG_MACH_SUN9I_A80))
++	if (IS_ENABLED(CONFIG_MACH_SUN9I))
+ 		return 0x410;
+ 
+ 	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6) || IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
