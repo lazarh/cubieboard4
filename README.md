@@ -149,10 +149,26 @@ install-to-emmc.sh
 
 ### WiFi (`wlan0`) missing after boot
 
-The BCM4330 SDIO chip is sensitive to power-up timing. If `wlan0` does not appear
-in `ip a`, simply reboot — the chip usually initialises correctly on the next attempt.
-The DTS is configured with a 500 ms reset hold delay and a 25 MHz SDIO clock cap to
-minimise the occurrence of this.
+If `wlan0` is absent and `dmesg` shows a repeating stream of:
+
+```
+sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+...
+mmc1: Failed to initialize a non-removable card
+```
+
+the root cause is a missing `mask_data0 = true` in `sun9i_a80_cfg` in the kernel
+sunxi-mmc driver. Without this flag, every MMC clock update waits for DATA0 to go
+high (`WAIT_PRE_OVER`), but the BCM4330 holds DATA0 low during initialisation,
+causing each update to time out after 750 ms and set `fatal_err = 1`.
+
+This is fixed by kernel patch `0003-mmc-sunxi-Add-mask_data0-to-sun9i-A80-config.patch`,
+included in this repository. Rebuild the kernel to apply it:
+
+```bash
+rm build/sources/linux-6.6.85/.patched
+scripts/build-kernel.sh
+```
 
 ### Spurious `brcmf_fweh_event_worker: event handler failed (72)` messages
 

@@ -1,0 +1,8 @@
+--- a/drivers/mmc/host/sunxi-mmc.c	2025-03-28 22:59:57.000000000 +0200
++++ b/drivers/mmc/host/sunxi-mmc.c	2026-03-07 07:00:00.000000000 +0200
+@@ -1165,6 +1165,7 @@ static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = sun9i_mmc_clk_delays,
+ 	.can_calibrate = false,
++	.mask_data0 = true,
+ };

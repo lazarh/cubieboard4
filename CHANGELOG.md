@@ -6,6 +6,41 @@ All notable changes to this project are documented here.
 
 ## 2026-03-07
 
+### Fixed — WiFi (BCM4330/brcmfmac) not initializing on mmc1
+
+After boot, `wlan0` was absent and the kernel printed a stream of:
+
+```
+sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+```
+
+every ~750 ms until `mmc1: Failed to initialize a non-removable card`.
+
+**Root cause**: `sun9i_a80_cfg` in `drivers/mmc/host/sunxi-mmc.c` was missing
+`mask_data0 = true`. Every other supported SoC (sun50i A64, sun20i D1, sun50i
+H616) sets this flag. Without it, `sunxi_mmc_oclk_onoff()` issues
+`SDXC_UPCLK_ONLY | SDXC_WAIT_PRE_OVER` to update the MMC clock. `WAIT_PRE_OVER`
+waits for DATA0 to be high (no card busy signal) before completing. While the
+BCM4330 module is in its reset/unresponsive state, DATA0 is held low, so every
+clock update times out after 750 ms and sets `priv->fatal_err = 1`, permanently
+preventing card initialization.
+
+When `mask_data0 = true` the driver sets `SDXC_MASK_DATA0` (bit 31 of CLKCR)
+before the clock-only update command, instructing the hardware to ignore the DATA0
+line state. Clock updates complete immediately, BCM4330 initializes normally, and
+brcmfmac brings up `wlan0`.
+
+- `patches/kernel/0003-mmc-sunxi-Add-mask_data0-to-sun9i-A80-config.patch`
+
+**To apply the fix:** delete the kernel patch stamp and rebuild:
+```
+rm build/sources/linux-6.6.85/.patched
+scripts/build-kernel.sh
+```
+Then rebuild the SD image and re-flash.
+
+---
+
 ### Fixed — eMMC boot failure after `install-to-emmc.sh` (five-part fix)
 
 After installing to eMMC via `install-to-emmc.sh`, U-Boot loaded from eMMC but
