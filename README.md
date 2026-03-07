@@ -106,6 +106,93 @@ This clones the running SD card system to the internal eMMC (`/dev/mmcblk2`). Re
 | Hostname pre-config | Optional — `HOSTNAME=myboard` |
 | WiFi pre-config | Optional — `WIFI_SSID=x WIFI_PASSWORD=y` |
 
+## Kernel patches — why CubieBoard4 needs them
+
+Three kernel patches are applied on top of mainline 6.6.85. None of these issues
+are specific to this build system — they are bugs or omissions in the upstream
+kernel that happen to affect the CubieBoard4.
+
+### Comparison with other AP6330 / BCM4330 boards
+
+The AP6330 (Broadcom BCM4330) WiFi+BT module is used on several boards. In
+mainline 6.6.85, only the CubieBoard4 DTS is missing the standard power-on
+timing and frequency properties:
+
+| Board | SoC | post-power-on-delay-ms | max-frequency | mask\_data0 | Upstream status |
+|---|---|---|---|---|---|
+| OUYA | Tegra30 | 300 ms | 50 MHz | N/A (Tegra MMC) | Complete |
+| Asus Transformer | Tegra30 | 300 ms | 50 MHz | N/A (Tegra MMC) | Complete |
+| Pegatron Chagall | Tegra30 | 300 ms | 50 MHz | N/A (Tegra MMC) | Complete |
+| **CubieBoard4** | **A80 (sun9i)** | **missing** | **missing** | **missing** | **Broken** |
+
+All Tegra30 boards ship with working BCM4330 WiFi out of the box. The
+CubieBoard4 is the only board where the upstream DTS and driver config are
+incomplete.
+
+### Patch 0001 — DTS: WiFi power-on delay and frequency cap
+
+**Scope: CubieBoard4-specific (device tree)**
+
+The upstream `sun9i-a80-cubieboard4.dts` defines the WiFi power sequence node
+(`wifi_pwrseq`) and SDIO host (`mmc@1c10000`) but omits two properties that
+every other BCM4330 board provides:
+
+- `post-power-on-delay-ms`: the BCM4330 needs time after its reset line is
+  released before it can respond to SDIO commands. All Tegra30 boards use
+  300 ms; we use 1000 ms because the A80 MMC controller initialisation is
+  slower.
+- `max-frequency`: caps the SDIO clock at 25 MHz, within the range tested
+  to work reliably on this board. Tegra30 boards use 50 MHz.
+
+These are standard `mmc-pwrseq-simple` and MMC subsystem properties — the
+upstream DTS simply never had them filled in for this board.
+
+### Patch 0002 — brcmfmac: fix netdev registration race
+
+**Scope: general kernel bug (all brcmfmac chipsets)**
+
+This is **not** CubieBoard4-specific. After `wiphy_register()`, every netdev
+with `ieee80211_ptr` set must be registered through
+`cfg80211_register_netdevice()` so that `wdev->registered` is set before
+`register_netdevice()` runs. The upstream code calls `register_netdev()` in
+the `locked=false` path (used by `brcmf_bus_started()` and the firmware E\_IF
+event handler), which only acquires `rtnl_lock` but not `wiphy_lock`.
+
+On BCM4330 SDIO the race is **reliably** triggered at boot because firmware
+E\_IF events arrive quickly via the SDIO interrupt while
+`brcmf_cfg80211_attach()` is still running. The result is a kernel BUG at
+`net/core/dev.c` (`reg_state != NETREG_UNINITIALIZED`) and a permanent
+`rtnl_lock` deadlock that hangs all subsequent `ip` commands.
+
+The fix acquires both `rtnl_lock` and `wiphy_lock` and always uses
+`cfg80211_register_netdevice()`. This applies to all brcmfmac chipsets
+(BCM4334, BCM4339, BCM43455, etc.) but is only reliably reproducible on
+BCM4330 SDIO due to timing.
+
+### Patch 0003 — sunxi-mmc: add mask\_data0 to sun9i\_a80\_cfg
+
+**Scope: upstream driver bug (Allwinner A80 only)**
+
+`sun9i_a80_cfg` in `drivers/mmc/host/sunxi-mmc.c` is the **only** SoC config
+struct missing `mask_data0 = true`. All other recent Allwinner configs have it:
+
+| SoC config | mask\_data0 |
+|---|---|
+| sun9i\_a80\_cfg | **false (missing)** |
+| sun20i\_d1\_cfg | true |
+| sun50i\_a64\_cfg | true |
+| sun50i\_h616\_cfg | true |
+
+Without this flag, `sunxi_mmc_oclk_onoff()` waits for DATA0 to go high
+(`WAIT_PRE_OVER`) during every clock update. The BCM4330 holds DATA0 low while
+in reset, so every clock change times out after ~750 ms and sets
+`fatal_err = 1`, permanently preventing card initialisation. The
+`mask_data0` flag is not chip-specific — it is an Allwinner MMC controller
+feature. The A80 hardware supports it; the driver config simply never set it.
+
+This bug also affects any other SDIO or non-removable MMC device on the A80
+where the card may hold DATA0 low during clock transitions.
+
 ## Source tarballs
 
 Source tarballs are downloaded to `build/sources/` on first run and reused on subsequent runs. Delete them to force a fresh download.
