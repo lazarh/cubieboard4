@@ -35,14 +35,23 @@ To also install Docker CE in the rootfs:
 sudo INSTALL_DOCKER=true scripts/build-rootfs.sh
 ```
 
-To pre-configure WiFi so the board connects on first boot:
+To pre-configure the hostname or WiFi so the board connects on first boot:
+
 ```bash
+# Set hostname at image build time (defaults to 'cubieboard4')
+sudo HOSTNAME="myboard" scripts/build-rootfs.sh
+
+# Pre-configure WiFi (requires WIFI_PASSWORD)
 sudo WIFI_SSID="MyNetwork" WIFI_PASSWORD="secret" scripts/build-rootfs.sh
 ```
 
 ### 5. Assemble the SD card image (as root)
 ```bash
+# Default output image under repo root
 sudo scripts/assemble-sd-image.sh
+
+# Or specify an explicit output image path:
+sudo scripts/assemble-sd-image.sh /path/to/output.img
 ```
 Produces `cubieboard4-debian13.img.gz` (and `.bmap`).
 
@@ -94,6 +103,7 @@ This clones the running SD card system to the internal eMMC (`/dev/mmcblk2`). Re
 | Debian suite | `trixie` (13), `armhf` |
 | WiFi | AP6330 / BCM4330 — `brcmfmac` driver, firmware from `firmware-brcm80211` |
 | Docker CE | Optional — `INSTALL_DOCKER=true` |
+| Hostname pre-config | Optional — `HOSTNAME=myboard` |
 | WiFi pre-config | Optional — `WIFI_SSID=x WIFI_PASSWORD=y` |
 
 ## Source tarballs
