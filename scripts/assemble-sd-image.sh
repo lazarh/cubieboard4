@@ -9,7 +9,13 @@
 # Must be run as root (loop device + mount).
 #
 # Output:
-#   cubieboard4-debian13.img.gz   (and matching .bmap for bmaptool)
+#   cubieboard4-debian13.img   (default uncompressed image path under repo root)
+#   The script will also produce a compressed image (same path with .gz) and an
+#   optional .bmap file for use with bmaptool when available.
+#
+#   You can override the output image path by passing it as the first argument:
+#     sudo scripts/assemble-sd-image.sh /path/to/output.img
+#   If no argument is supplied the repository-default path is used.
 
 set -euo pipefail
 
@@ -19,7 +25,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SYSROOT="${REPO_ROOT}/debian-rootfs"
 UBOOT_BUILD="${REPO_ROOT}/build/uboot"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
-OUTPUT="${REPO_ROOT}/cubieboard4-debian13.img"
+# Allow overriding output image path via first argument
+OUTPUT="${1:-${REPO_ROOT}/cubieboard4-debian13.img}"
 
 BOOT_SIZE_MIB=80       # FAT boot partition size in MiB (40 MiB gap + 80 MiB = 120 MiB boundary)
 IMAGE_SIZE_MIB=3200    # Total image size (~3 GiB; grows to fill eMMC after install)
@@ -63,8 +70,10 @@ echo "    boot.scr: ${BOOT_SCR}"
 
 # ── Create blank image ─────────────────────────────────────────────────────
 
-echo "==> Creating ${IMAGE_SIZE_MIB} MiB image file..."
+echo "==> Creating ${IMAGE_SIZE_MIB} MiB image file at: ${OUTPUT}"
 rm -f "${OUTPUT}"
+mkdir -p "$(dirname "${OUTPUT}")"
+# If OUTPUT already exists and is a sparse/large file, overwrite; otherwise create
 fallocate -l "${IMAGE_SIZE_MIB}MiB" "${OUTPUT}"
 
 # ── Partition ──────────────────────────────────────────────────────────────
@@ -136,6 +145,12 @@ LOOP_DEV=""
 
 echo "==> Compressing to ${OUTPUT}.gz ..."
 pigz -9 --keep "${OUTPUT}" 2>/dev/null || gzip -9 -k "${OUTPUT}"
+
+# If bmaptool exists, write bmap for the compressed image
+if command -v bmaptool >/dev/null 2>&1; then
+    bmaptool create "${OUTPUT}.gz" > "${OUTPUT}.gz.bmap"
+    echo "==> bmap written to ${OUTPUT}.gz.bmap"
+fi
 
 if command -v bmaptool >/dev/null 2>&1; then
     bmaptool create "${OUTPUT}" > "${OUTPUT}.gz.bmap"
