@@ -1,0 +1,63 @@
+From: CubieBoard4 Build <build@cubieboard4>
+Date: Mon, 1 Jan 2024 00:00:00 +0000
+Subject: [PATCH 5/5] mmc: sunxi: Pre-enable CLK after hardware reset
+
+The A80 (sun9i) MMC controller's CLKCR register is not cleared by
+SDXC_HARDWARE_RESET issued in sunxi_mmc_reset_host(). Channels that
+were initialised by U-Boot retain SDXC_CARD_CLOCK_ON=1 from that
+initialisation, so the first UPCLK_ONLY command in oclk_onoff()
+succeeds immediately.
+
+However, channels that U-Boot never touches (e.g. the SDIO slot used
+for a WiFi chip) have CLKCR=0 at power-on.  When sunxi_mmc_reset_host()
+is called on such a channel CLKCR remains zero; the subsequent
+UPCLK_ONLY command then hangs for the full 750 ms timeout because the
+hardware never asserts the clock line when SDXC_CARD_CLOCK_ON=0.  This
+sets host->ferror, permanently disabling the controller and preventing
+any SDIO/WiFi device from being probed.
+
+Fix this by writing SDXC_CARD_CLOCK_ON into CLKCR immediately after
+the hardware reset in sunxi_mmc_init_host().  The divider and other
+fields in CLKCR will be reprogrammed by sunxi_mmc_clk_set_rate() once
+a card is detected.  This mirrors the explicit workaround present in
+U-Boot's drivers/mmc/sunxi_mmc.c.
+
+Fixes WiFi (BCM4330 SDIO on mmc@1c10000) failing to initialise on
+Allwinner A80 (CubieBoard4) with "fatal err update clk timeout".
+
+Signed-off-by: CubieBoard4 Build <build@cubieboard4>
+---
+ drivers/mmc/host/sunxi-mmc.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+--- a/drivers/mmc/host/sunxi-mmc.c	2024-01-01 00:00:00.000000000 +0000
++++ b/drivers/mmc/host/sunxi-mmc.c	2024-01-01 00:00:01.000000000 +0000
+@@ -328,9 +328,23 @@
+ 	if (sunxi_mmc_reset_host(host))
+ 		return -EIO;
+ 
+-	/*
+-	 * Burst 8 transfers, RX trigger level: 7, TX trigger level: 8
+-	 *
+-	 * TODO: sun9i has a larger FIFO and supports higher trigger values
++	/*
++	 * After SDXC_HARDWARE_RESET the CLKCR register is not reset by the
++	 * hardware, so it retains whatever value it had.  If this channel was
++	 * never initialised before (e.g. a WiFi SDIO slot that U-Boot never
++	 * touched) CLKCR will be zero, meaning SDXC_CARD_CLOCK_ON = 0.  A
++	 * subsequent UPCLK_ONLY command issued by sunxi_mmc_oclk_onoff() will
++	 * then hang forever: the hardware waits for the clock line to toggle
++	 * but the clock is gated.  Pre-set SDXC_CARD_CLOCK_ON here so the
++	 * first UPCLK_ONLY can complete.  The divider bits will be
++	 * reprogrammed by sunxi_mmc_clk_set_rate() shortly after.
++	 * This mirrors the workaround in U-Boot's drivers/mmc/sunxi_mmc.c.
++	 */
++	mmc_writel(host, REG_CLKCR, SDXC_CARD_CLOCK_ON);
++
++	/*
++	 * Burst 8 transfers, RX trigger level: 7, TX trigger level: 8
++	 *
++	 * TODO: sun9i has a larger FIFO and supports higher trigger values
+ 	 */
+ 	mmc_writel(host, REG_FTRGL, 0x20070008);
