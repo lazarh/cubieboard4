@@ -1,0 +1,70 @@
+From: CubieBoard4 Build System <build@cubieboard4>
+Date: Fri, 7 Mar 2026 07:10:00 +0200
+Subject: [PATCH 4/4] mmc: sunxi: skip WAIT_PRE_OVER in clock update when
+ mask_data0 is set
+
+When an SD card (mmc0) is inserted at the same time as the BCM4330
+WiFi SDIO device (mmc1) is initialising, the WiFi interface fails
+to come up on the Allwinner A80 (CubieBoard4).
+
+The symptom is a stream of "fatal err update clk timeout" messages
+from mmc1, one every 750 ms, ending in:
+
+  mmc1: Failed to initialize a non-removable card
+
+Root cause
+----------
+sunxi_mmc_oclk_onoff() issues a clock-update-only command with both
+SDXC_UPCLK_ONLY and SDXC_WAIT_PRE_OVER set.  WAIT_PRE_OVER tells
+the controller to poll DATA0 until the card signals "not busy"
+before completing the command.
+
+The BCM4330 holds DATA0 low while it is held in reset by its
+mmc-pwrseq.  Patch 0003 added SDXC_MASK_DATA0 to CLKCR, which is
+documented to bypass the DATA0 idle check when writing the clock
+configuration register.  However, on the A80 the MASK_DATA0 bit in
+CLKCR does not suppress the WAIT_PRE_OVER check in the subsequent
+CMDR write: SDXC_START is never cleared, the poll loop always runs
+to its 750 ms deadline, and oclk_onoff returns -EIO.
+
+With the SD card absent mmc0 is idle, so there is no electrical load
+difference and BCM4330's DATA0 floats high enough for WAIT_PRE_OVER
+to clear quickly — WiFi then works.  With the SD card present the
+additional bus activity and supply perturbation keeps DATA0 firmly
+low, exposing the WAIT_PRE_OVER stall every time.
+
+Fix
+---
+When mask_data0 is set for a host, the intent is already "do not
+wait for DATA0 to be released".  Extending that intent to the CMDR
+write — by not including SDXC_WAIT_PRE_OVER — makes the command
+complete immediately regardless of the DATA0 state, which is exactly
+what mask_data0 was always supposed to achieve.  WAIT_PRE_OVER is
+retained for hosts that do not set mask_data0.
+
+Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
+---
+ drivers/mmc/host/sunxi-mmc.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -676,7 +676,16 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ 
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
+-	rval = SDXC_START | SDXC_UPCLK_ONLY | SDXC_WAIT_PRE_OVER;
++	/*
++	 * When mask_data0 is set, SDXC_MASK_DATA0 in CLKCR tells the
++	 * hardware to bypass the DATA0 idle check in the CLKCR write path,
++	 * but the WAIT_PRE_OVER flag in CMDR re-introduces that same check
++	 * independently.  Skip WAIT_PRE_OVER so that clock-update commands
++	 * complete even when DATA0 is held low (e.g. a WiFi SDIO device in
++	 * reset that cannot release DATA0 before it is powered on).
++	 */
++	rval = SDXC_START | SDXC_UPCLK_ONLY;
++	if (!host->cfg->mask_data0)
++		rval |= SDXC_WAIT_PRE_OVER;
+ 	mmc_writel(host, REG_CMDR, rval);
+ 
+ 	do {
