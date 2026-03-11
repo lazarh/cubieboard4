@@ -178,6 +178,15 @@ make -C "${UBOOT_SRC}" \
     O="${BUILD_DIR}" \
     Cubieboard4_defconfig
 
+# Override bootcmd: try eMMC (mmc 1) directly first, before any distro scan
+# probes mmc0.  On A80 the voltage-select failure for a plain SD card
+# corrupts the shared mmc_config_clk state and prevents eMMC init.
+# Booting eMMC directly avoids touching mmc0 entirely.
+# Fall back to distro_bootcmd for initial SD-card installs.
+cat >> "${BUILD_DIR}/.config" << 'UBOOT_CFG'
+CONFIG_BOOTCOMMAND="if mmc dev 1 && load mmc 1:1 ${fdt_addr_r} ${fdtfile}; then if load mmc 1:1 ${kernel_addr_r} zImage || load mmc 1:1 ${kernel_addr_r} boot/zImage; then setenv bootargs console=ttyS0,115200 console=tty1 root=/dev/mmcblk2p2 rootwait panic=10 ${extra}; bootz ${kernel_addr_r} - ${fdt_addr_r}; fi; fi; run distro_bootcmd"
+UBOOT_CFG
+
 # ── Build ──────────────────────────────────────────────────────────────────
 
 echo "==> Building U-Boot (-j${JOBS})..."
