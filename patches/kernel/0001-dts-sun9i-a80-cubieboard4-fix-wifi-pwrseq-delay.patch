@@ -22,18 +22,18 @@ Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
 --- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts	2025-03-28 22:59:57.000000000 +0200
 +++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts	2026-03-06 14:18:45.483031984 +0200
 @@ -116,6 +116,7 @@
- compatible = "mmc-pwrseq-simple";
- clocks = <&ac100_rtc 1>;
- clock-names = "ext_clock";
-+post-power-on-delay-ms = <1000>;
- /* enables internal regulator and de-asserts reset */
- reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
- };
+ 		compatible = "mmc-pwrseq-simple";
+ 		clocks = <&ac100_rtc 1>;
+ 		clock-names = "ext_clock";
++		post-power-on-delay-ms = <1000>;
+ 		/* enables internal regulator and de-asserts reset */
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
+ 	};
 @@ -162,6 +163,7 @@
- vqmmc-supply = <&reg_cldo3>;
- mmc-pwrseq = <&wifi_pwrseq>;
- bus-width = <4>;
-+max-frequency = <25000000>;
- non-removable;
- status = "okay";
+ 	vqmmc-supply = <&reg_cldo3>;
+ 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
++	max-frequency = <25000000>;
+ 	non-removable;
+ 	status = "okay";
  };
