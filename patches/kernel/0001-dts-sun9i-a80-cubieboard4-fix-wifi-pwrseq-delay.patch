@@ -19,8 +19,8 @@ Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
  arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts | 2 ++
  1 file changed, 2 insertions(+)
 
---- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts2025-03-28 22:59:57.000000000 +0200
-+++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts2026-03-06 14:18:45.483031984 +0200
+--- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts	2025-03-28 22:59:57.000000000 +0200
++++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts	2026-03-06 14:18:45.483031984 +0200
 @@ -116,6 +116,7 @@
  compatible = "mmc-pwrseq-simple";
  clocks = <&ac100_rtc 1>;

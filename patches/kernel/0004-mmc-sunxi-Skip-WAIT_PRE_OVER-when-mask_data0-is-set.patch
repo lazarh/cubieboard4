@@ -49,7 +49,7 @@ Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
 
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -676,7 +676,16 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+@@ -676,7 +676,17 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
  
  	mmc_writel(host, REG_CLKCR, rval);
  
