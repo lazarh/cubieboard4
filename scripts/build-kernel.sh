@@ -15,10 +15,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-KERNEL_VERSION="6.6.85"
+KERNEL_VERSION="6.19"
 KRELEASE="6"
 KERNEL_URL="https://www.kernel.org/pub/linux/kernel/v${KRELEASE}.x/linux-${KERNEL_VERSION}.tar.xz"
-KERNEL_SHA256="5ebaccf4ca3428cd26817bae62171f4efd270eed866a3e3d0a1d9e970b7b7529"
+# SHA256 of linux-6.19.tar.xz; leave empty to skip verification.
+# After first download, record it with: sha256sum build/sources/linux-6.19.tar.xz
+KERNEL_SHA256=""
+
+# Set to false to skip applying patches (useful for testing upstream versions)
+APPLY_KERNEL_PATCHES="${APPLY_KERNEL_PATCHES:-true}"
 
 CROSS_COMPILE="${CROSS_COMPILE:-arm-linux-gnueabihf-}"
 ARCH=arm
@@ -49,7 +54,12 @@ if [[ ! -f "${TARBALL}" ]]; then
 fi
 
 echo "==> Verifying checksum..."
-echo "${KERNEL_SHA256}  ${TARBALL}" | sha256sum -c -
+if [[ -n "${KERNEL_SHA256}" ]]; then
+    echo "${KERNEL_SHA256}  ${TARBALL}" | sha256sum -c -
+else
+    echo "    Checksum not set — skipping verification."
+    echo "    SHA256: $(sha256sum "${TARBALL}" | cut -d' ' -f1)"
+fi
 
 # ── Extract ────────────────────────────────────────────────────────────────
 
@@ -60,15 +70,19 @@ fi
 
 # ── Apply patches ──────────────────────────────────────────────────────────
 
-if [[ ! -f "${PATCH_STAMP}" ]]; then
-    echo "==> Applying kernel patches..."
-    for p in "${PATCHES_DIR}"/*.patch; do
-        [[ -f "${p}" ]] || continue
-        echo "    Applying $(basename "${p}")..."
-        patch -N -r /dev/null -p1 -d "${KERNEL_SRC}" < "${p}" || true
-    done
-    touch "${PATCH_STAMP}"
-    echo "    Patches applied."
+if [[ "${APPLY_KERNEL_PATCHES}" == true ]]; then
+    if [[ ! -f "${PATCH_STAMP}" ]]; then
+        echo "==> Applying kernel patches..."
+        for p in "${PATCHES_DIR}"/*.patch; do
+            [[ -f "${p}" ]] || continue
+            echo "    Applying $(basename "${p}")..."
+            patch -N -r /dev/null -p1 -d "${KERNEL_SRC}" < "${p}" || true
+        done
+        touch "${PATCH_STAMP}"
+        echo "    Patches applied."
+    fi
+else
+    echo "==> Skipping patches (APPLY_KERNEL_PATCHES=false)"
 fi
 
 # ── Configure ─────────────────────────────────────────────────────────────

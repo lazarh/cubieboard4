@@ -13,11 +13,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-UBOOT_VERSION="2024.01"
+UBOOT_VERSION="2026.01"
 UBOOT_URL="https://ftp.denx.de/pub/u-boot/u-boot-${UBOOT_VERSION}.tar.bz2"
-# SHA256 of u-boot-2024.01.tar.bz2; leave empty to skip verification.
-# After first download, record it with: sha256sum build/sources/u-boot-2024.01.tar.bz2
+# SHA256 of u-boot-2026.01.tar.bz2; leave empty to skip verification.
+# After first download, record it with: sha256sum build/sources/u-boot-2026.01.tar.bz2
 UBOOT_SHA256=""
+
+# Set to false to skip applying patches (useful for testing upstream versions)
+APPLY_UBOOT_PATCHES="${APPLY_UBOOT_PATCHES:-true}"
 
 CROSS_COMPILE="${CROSS_COMPILE:-arm-linux-gnueabihf-}"
 ARCH=arm
@@ -62,22 +65,23 @@ fi
 
 # ── Apply patches ──────────────────────────────────────────────────────────
 
-PATCH_STAMP="${UBOOT_SRC}/.patched"
-if [[ ! -f "${PATCH_STAMP}" ]]; then
-    echo "==> Applying patches..."
-    for patch in "${PATCHES_DIR}"/*.patch; do
-        [[ -f "${patch}" ]] || continue
-        echo "    Applying: $(basename "${patch}")"
-        patch -N -d "${UBOOT_SRC}" -p1 < "${patch}" || true
-    done
+if [[ "${APPLY_UBOOT_PATCHES}" == true ]]; then
+    PATCH_STAMP="${UBOOT_SRC}/.patched"
+    if [[ ! -f "${PATCH_STAMP}" ]]; then
+        echo "==> Applying patches..."
+        for patch in "${PATCHES_DIR}"/*.patch; do
+            [[ -f "${patch}" ]] || continue
+            echo "    Applying: $(basename "${patch}")"
+            patch -N -d "${UBOOT_SRC}" -p1 < "${patch}" || true
+        done
 
-    # Fix pylibfdt setup.py for SWIG >= 4.2 compatibility.
-    # SWIG 4.2 changed SWIG_Python_AppendOutput from 2 to 3 arguments, but
-    # the libfdt.i typemaps in U-Boot 2024.01 still generate 2-arg call
-    # sites. Override build_ext.swig_sources() to fix the calls after SWIG
-    # generates libfdt_wrap.c so the C compiler is happy.
-    echo "==> Patching pylibfdt setup.py for SWIG >= 4.2 compatibility..."
-    python3 - "${UBOOT_SRC}/scripts/dtc/pylibfdt/setup.py" <<'PYEOF'
+        # Fix pylibfdt setup.py for SWIG >= 4.2 compatibility.
+        # SWIG 4.2 changed SWIG_Python_AppendOutput from 2 to 3 arguments, but
+        # the libfdt.i typemaps in U-Boot 2024.01 still generate 2-arg call
+        # sites. Override build_ext.swig_sources() to fix the calls after SWIG
+        # generates libfdt_wrap.c so the C compiler is happy.
+        echo "==> Patching pylibfdt setup.py for SWIG >= 4.2 compatibility..."
+        python3 - "${UBOOT_SRC}/scripts/dtc/pylibfdt/setup.py" <<'PYEOF'
 import sys
 
 path = sys.argv[1]
@@ -166,7 +170,10 @@ with open(path, 'w') as f:
 print("    setup.py patched successfully.")
 PYEOF
 
-    touch "${PATCH_STAMP}"
+        touch "${PATCH_STAMP}"
+    fi
+else
+    echo "==> Skipping patches (APPLY_UBOOT_PATCHES=false)"
 fi
 
 # ── Configure ─────────────────────────────────────────────────────────────
