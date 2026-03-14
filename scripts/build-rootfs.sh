@@ -44,13 +44,14 @@ echo "FORCE_REBUILD:    ${FORCE_REBUILD}"
 echo "REBUILD_PACKAGES: ${REBUILD_PACKAGES}"
 echo "REBUILD_KERNEL:   ${REBUILD_KERNEL}"
 echo "INSTALL_DOCKER:   ${INSTALL_DOCKER:-false}"
-echo "HOSTNAME:         ${HOSTNAME:-cubieboard4}"
+echo "HOSTNAME:         cubieboard4"
 echo "========================================"
 echo ""
 
 # Export variables for sub-scripts
 export INSTALL_DOCKER="${INSTALL_DOCKER:-false}"
-export HOSTNAME="${HOSTNAME:-cubieboard4}"
+# Force default hostname (ignore build machine's HOSTNAME)
+export HOSTNAME="cubieboard4"
 export WIFI_SSID="${WIFI_SSID:-}"
 export WIFI_PASSWORD="${WIFI_PASSWORD:-}"
 
