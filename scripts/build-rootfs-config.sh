@@ -186,17 +186,17 @@ else
     echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found."
 fi
 
-# ── Fix regulatory.db symlink ─────────────────────────────────────────────
+# ── Fix regulatory.db - replace symlinks with actual files ───────────────────
 
-if [[ -L "${SYSROOT}/lib/firmware/regulatory.db" ]]; then
-    echo "==> Fixing regulatory.db and signature..."
-    rm -f "${SYSROOT}/lib/firmware/regulatory.db" "${SYSROOT}/lib/firmware/regulatory.db.p7s"
-    if [[ -f "${SYSROOT}/lib/firmware/regulatory.db-upstream" ]]; then
-        cp "${SYSROOT}/lib/firmware/regulatory.db-upstream" "${SYSROOT}/lib/firmware/regulatory.db"
-    fi
-    if [[ -f "${SYSROOT}/lib/firmware/regulatory.db.p7s-upstream" ]]; then
-        cp "${SYSROOT}/lib/firmware/regulatory.db.p7s-upstream" "${SYSROOT}/lib/firmware/regulatory.db.p7s"
-    fi
+echo "==> Fixing regulatory.db and signature..."
+# Remove symlinks and broken files
+rm -f "${SYSROOT}/lib/firmware/regulatory.db" "${SYSROOT}/lib/firmware/regulatory.db.p7s"
+# Copy actual files
+if [[ -f "${SYSROOT}/lib/firmware/regulatory.db-upstream" ]]; then
+    cp "${SYSROOT}/lib/firmware/regulatory.db-upstream" "${SYSROOT}/lib/firmware/regulatory.db"
+fi
+if [[ -f "${SYSROOT}/lib/firmware/regulatory.db.p7s-upstream" ]]; then
+    cp "${SYSROOT}/lib/firmware/regulatory.db.p7s-upstream" "${SYSROOT}/lib/firmware/regulatory.db.p7s"
 fi
 
 # ── Embed install-to-emmc.sh ──────────────────────────────────────────────
