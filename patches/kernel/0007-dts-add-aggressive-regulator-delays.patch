@@ -1,0 +1,46 @@
+From: CubieBoard4 Build <build@cubieboard4>
+Date: Sat, 14 Mar 2026 00:00:00 +0000
+Subject: [PATCH] dts: sun9i-a80-cubieboard4: Add aggressive regulator delays for WiFi
+
+Add aggressive regulator-enable-ramp-delay to both WiFi regulators:
+- reg_dldo1 (vcc-wifi) - main WiFi power
+- reg_cldo3 (vcc-io-wifi-codec-io2) - I/O power
+
+This addresses "voltage operation not allowed" errors that cause
+"fatal err update clk timeout" when the MMC driver tries to update
+the clock before the regulator is ready.
+
+Also add regulator-boot-on to keep WiFi regulators always on during boot.
+
+Signed-off-by: CubieBoard4 Build <build@cubieboard4>
+---
+ arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
+index def5678..jkl3456 100644
+--- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
+@@ -288,6 +288,8 @@
+ 
+ 			reg_dldo1: dldo1 {
++				regulator-enable-ramp-delay = <500000>;
++				regulator-boot-on;
+ 				/*
+ 				 * The WiFi chip supports a wide range
+ 				 * (3.0 ~ 4.8V) of voltages, and so does
+@@ -296,6 +298,7 @@
+ 				 */
+ 				regulator-min-microvolt = <3300000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-name = "vcc-wifi";
+ 			};
+ 
+@@ -431,6 +434,7 @@
+ 
+ 			reg_cldo3: cldo3 {
+ 				regulator-enable-ramp-delay = <200000>;
++				regulator-boot-on;
+ 				regulator-min-microvolt = <3000000>;
+ 				regulator-max-microvolt = <3000000>;
+ 				regulator-name = "vcc-io-wifi-codec-io2";

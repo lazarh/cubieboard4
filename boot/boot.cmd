@@ -18,7 +18,7 @@ if test "${devnum}" = "1"; then
 	setenv mmc_rootdev mmcblk2p2
 fi
 
-setenv bootargs console=ttyS0,115200 console=tty1 root=/dev/${mmc_rootdev} rootwait panic=10 ${extra}
+setenv bootargs console=ttyS0,115200 console=tty1 root=/dev/${mmc_rootdev} rootwait panic=10 regulator.debug=1 ${extra}
 load mmc ${devnum}:1 ${fdt_addr_r} ${fdtfile} || load mmc ${devnum}:1 ${fdt_addr_r} boot/allwinner/${fdtfile}
 load mmc ${devnum}:1 ${kernel_addr_r} zImage || load mmc ${devnum}:1 ${kernel_addr_r} boot/zImage
 bootz ${kernel_addr_r} - ${fdt_addr_r}

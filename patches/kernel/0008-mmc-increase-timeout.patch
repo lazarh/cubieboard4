@@ -1,0 +1,30 @@
+From: CubieBoard4 Build System <build@cubieboard4>
+Date: Sat, 14 Mar 2026 18:00:00 +0200
+Subject: [PATCH] mmc: sunxi: Increase clock update timeout for WiFi SDIO
+
+The A80's mmc1 (WiFi SDIO) can fail with "fatal err update clk timeout"
+when the WiFi module takes longer than 750ms to respond to clock commands.
+This is common with BCM4330/BCM43430 modules that have slow power-up.
+
+Increase the timeout from 750ms to 2000ms to give the WiFi module more
+time to become ready after power is applied via the mmc-pwrseq.
+
+Also change dev_dbg to dev_info to see these messages in dmesg.
+
+Signed-off-by: CubieBoard4 Build System <build@cubieboard4>
+---
+ drivers/mmc/host/sunxi-mmc.c | 4 ++---
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -674,7 +674,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+-	unsigned long expire = jiffies + msecs_to_jiffies(750);
++	unsigned long expire = jiffies + msecs_to_jiffies(2000);
+ 	u32 rval;
+ 
+-	dev_dbg(mmc_dev(host->mmc), "%sabling the clock\n",
++	dev_info(mmc_dev(host->mmc), "%sabling the clock\n",
+ 		oclk_en ? "en" : "dis");
+ 
+ 	rval = mmc_readl(host, REG_CLKCR);

@@ -23,7 +23,7 @@ KERNEL_URL="https://www.kernel.org/pub/linux/kernel/v${KRELEASE}.x/linux-${KERNE
 KERNEL_SHA256=""
 
 # Set to false to skip applying patches (useful for testing upstream versions)
-APPLY_KERNEL_PATCHES="${APPLY_KERNEL_PATCHES:-true}"
+APPLY_KERNEL_PATCHES="false"
 
 CROSS_COMPILE="${CROSS_COMPILE:-arm-linux-gnueabihf-}"
 ARCH=arm

@@ -25,6 +25,7 @@ MODULES_DIR="${KERNEL_BUILD}/modules"
 BOARD_HOSTNAME="${BOARD_HOSTNAME:-cubieboard4}"
 WIFI_SSID="${WIFI_SSID:-}"
 WIFI_PASSWORD="${WIFI_PASSWORD:-}"
+WIFI_DELAY="${WIFI_DELAY:-5}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -141,15 +142,89 @@ else
     echo "    sysctl already configured."
 fi
 
-# ── Load brcmfmac module ─────────────────────────────────────────────────
+# ── Load brcmfmac module with delay ──────────────────────────────────────────
 
-if ! grep -q "^brcmfmac$" "${SYSROOT}/etc/modules" 2>/dev/null; then
-    echo "==> Adding brcmfmac and cfg80211 to /etc/modules..."
-    echo "cfg80211" >> "${SYSROOT}/etc/modules"
-    echo "brcmfmac" >> "${SYSROOT}/etc/modules"
+SYSTEMD_DIR="${SYSROOT}/etc/systemd/system"
+WIFI_LOADER="${SYSROOT}/usr/local/bin/load-wifi.sh"
+mkdir -p "${SYSTEMD_DIR}"
+mkdir -p "$(dirname "${WIFI_LOADER}")"
+
+if [[ ! -f "${SYSTEMD_DIR}/brcmfmac.service" ]]; then
+    echo "==> Creating WiFi loader script and systemd service..."
+    
+    cat > "${WIFI_LOADER}" <<'EOF'
+#!/bin/sh
+echo "WiFi loader: Starting..."
+echo "WiFi loader: Waiting for system to settle..."
+sleep 15
+
+for i in 1 2 3 4 5 6 7 8; do
+    echo "WiFi loader: Attempt $i - trying to enable mmc1..."
+    
+    for dev in /sys/bus/platform/devices/1c10000.mmc /sys/bus/platform/devices/sunxi-mmc.0; do
+        if [ -d "$dev" ]; then
+            echo "enabled" > "$dev/status" 2>/dev/null && \
+                echo "WiFi loader: Enabled $dev" && break
+        fi
+    done
+    
+    sleep 3
+    
+    echo "WiFi loader: Loading modules..."
+    modprobe cfg80211 2>/dev/null
+    sleep 1
+    modprobe brcmfmac 2>/dev/null
+    sleep 3
+    
+    if [ -d /sys/class/net/wlan0 ]; then
+        echo "WiFi loader: Success! wlan0 found"
+        exit 0
+    fi
+    
+    echo "WiFi loader: wlan0 not found, retrying..."
+    rmmod brcmfmac 2>/dev/null
+    rmmod cfg80211 2>/dev/null
+    sleep 10
+done
+
+echo "WiFi loader: Failed after 8 attempts"
+exit 1
+EOF
+    chmod +x "${WIFI_LOADER}"
+    
+    cat > "${SYSTEMD_DIR}/brcmfmac.service" <<'EOF'
+[Unit]
+Description=Delayed WiFi module loader
+After=systemd-modules-load.service
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/load-wifi.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    ln -sf /etc/systemd/system/brcmfmac.service "${SYSTEMD_DIR}/multi-user.target.wants/brcmfmac.service"
 else
-    echo "    brcmfmac already in /etc/modules."
+    echo "    brcmfmac service already exists."
 fi
+
+if grep -q "^brcmfmac$" "${SYSROOT}/etc/modules" 2>/dev/null; then
+    echo "==> Removing brcmfmac from /etc/modules (using systemd service instead)..."
+    sed -i '/^brcmfmac$/d' "${SYSROOT}/etc/modules"
+    sed -i '/^cfg80211$/d' "${SYSROOT}/etc/modules"
+fi
+
+echo "==> Creating brcmfmac blacklist to prevent auto-load..."
+mkdir -p "${SYSROOT}/etc/modprobe.d"
+cat > "${SYSROOT}/etc/modprobe.d/brcmfmac.conf" <<'EOF'
+# Prevent brcmfmac from auto-loading at boot
+# WiFi will be loaded by brcmfmac.service after system is ready
+blacklist brcmfmac
+blacklist cfg80211
+EOF
 
 # ── wpa_supplicant config ────────────────────────────────────────────────
 
