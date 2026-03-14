@@ -186,6 +186,16 @@ else
     echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found."
 fi
 
+# ── Fix regulatory.db symlink ─────────────────────────────────────────────
+
+if [[ -L "${SYSROOT}/lib/firmware/regulatory.db" ]]; then
+    echo "==> Fixing regulatory.db symlink..."
+    rm -f "${SYSROOT}/lib/firmware/regulatory.db"
+    if [[ -f "${SYSROOT}/lib/firmware/regulatory.db-upstream" ]]; then
+        cp "${SYSROOT}/lib/firmware/regulatory.db-upstream" "${SYSROOT}/lib/firmware/regulatory.db"
+    fi
+fi
+
 # ── Embed install-to-emmc.sh ──────────────────────────────────────────────
 
 if [[ ! -f "${SYSROOT}/usr/local/sbin/install-to-emmc.sh" ]]; then
