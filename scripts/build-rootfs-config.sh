@@ -189,10 +189,13 @@ fi
 # ── Fix regulatory.db symlink ─────────────────────────────────────────────
 
 if [[ -L "${SYSROOT}/lib/firmware/regulatory.db" ]]; then
-    echo "==> Fixing regulatory.db symlink..."
-    rm -f "${SYSROOT}/lib/firmware/regulatory.db"
+    echo "==> Fixing regulatory.db and signature..."
+    rm -f "${SYSROOT}/lib/firmware/regulatory.db" "${SYSROOT}/lib/firmware/regulatory.db.p7s"
     if [[ -f "${SYSROOT}/lib/firmware/regulatory.db-upstream" ]]; then
         cp "${SYSROOT}/lib/firmware/regulatory.db-upstream" "${SYSROOT}/lib/firmware/regulatory.db"
+    fi
+    if [[ -f "${SYSROOT}/lib/firmware/regulatory.db.p7s-upstream" ]]; then
+        cp "${SYSROOT}/lib/firmware/regulatory.db.p7s-upstream" "${SYSROOT}/lib/firmware/regulatory.db.p7s"
     fi
 fi
 
