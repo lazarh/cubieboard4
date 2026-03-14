@@ -58,12 +58,11 @@ mount_chroot
 
 # ── Hostname ─────────────────────────────────────────────────────────────
 
-if [[ "$(cat "${SYSROOT}/etc/hostname" 2>/dev/null)" != "${HOSTNAME}" ]]; then
-    echo "==> Setting hostname to ${HOSTNAME}..."
-    echo "${HOSTNAME}" > "${SYSROOT}/etc/hostname"
-else
-    echo "    Hostname already set to ${HOSTNAME}."
-fi
+echo "==> Setting hostname to ${HOSTNAME}..."
+echo "${HOSTNAME}" > "${SYSROOT}/etc/hostname"
+# Remove machine-id so systemd regenerates it (prevents hostname conflicts)
+rm -f "${SYSROOT}/etc/machine-id"
+touch "${SYSROOT}/etc/machine-id"
 
 # ── /etc/hosts ───────────────────────────────────────────────────────────
 

@@ -81,12 +81,12 @@ else
     chroot "${SYSROOT}" apt-get install -y --no-install-recommends \
         systemd-sysv dbus systemd-timesyncd \
         iproute2 iputils-ping iw wpasupplicant network-manager \
-        openssh-server \
+        openssh-server sudo \
         firmware-brcm80211 wireless-regdb \
         usbutils pciutils \
         vim-tiny less \
         util-linux e2fsprogs dosfstools parted \
-        rsync wget curl \
+        rsync wget curl git neovim btop docker.io \
         mtd-utils \
         kmod iptables conntrack nftables
 
@@ -96,7 +96,12 @@ else
     chroot "${SYSROOT}" update-alternatives --set arptables /usr/sbin/arptables-legacy 2>/dev/null || true
     chroot "${SYSROOT}" update-alternatives --set ebtables /usr/sbin/ebtables-legacy 2>/dev/null || true
 
-    # Docker CE (optional)
+    # Enable Docker if installed (either from docker.io or docker-ce)
+    if dpkg -l docker.io docker-ce 2>/dev/null | grep -q "^ii"; then
+        chroot "${SYSROOT}" systemctl enable docker.service 2>/dev/null || true
+    fi
+
+    # Docker CE (optional) - installs newer Docker from Docker's repos
     if [[ "${INSTALL_DOCKER}" == "true" ]]; then
         echo "==> Setting up Docker CE..."
         install -m 0755 -d "${SYSROOT}/etc/apt/keyrings"
