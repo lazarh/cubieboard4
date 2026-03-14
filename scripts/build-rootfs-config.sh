@@ -8,7 +8,7 @@
 #   scripts/build-rootfs-packages.sh should have been run
 #
 # Environment variables:
-#   HOSTNAME=myboard      — set board hostname (default: cubieboard4)
+#   BOARD_HOSTNAME=myboard — set board hostname (default: cubieboard4)
 #   WIFI_SSID=MyNetwork   — pre-configure WiFi (requires WIFI_PASSWORD)
 #   WIFI_PASSWORD=secret  — WPA2 passphrase for WIFI_SSID
 #
@@ -22,7 +22,7 @@ SYSROOT="${REPO_ROOT}/debian-rootfs"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 
-HOSTNAME="${HOSTNAME:-cubieboard4}"
+BOARD_HOSTNAME="${BOARD_HOSTNAME:-cubieboard4}"
 WIFI_SSID="${WIFI_SSID:-}"
 WIFI_PASSWORD="${WIFI_PASSWORD:-}"
 
@@ -58,8 +58,8 @@ mount_chroot
 
 # ── Hostname ─────────────────────────────────────────────────────────────
 
-echo "==> Setting hostname to ${HOSTNAME}..."
-echo "${HOSTNAME}" > "${SYSROOT}/etc/hostname"
+echo "==> Setting hostname to ${BOARD_HOSTNAME}..."
+echo "${BOARD_HOSTNAME}" > "${SYSROOT}/etc/hostname"
 # Remove machine-id so systemd regenerates it (prevents hostname conflicts)
 rm -f "${SYSROOT}/etc/machine-id"
 touch "${SYSROOT}/etc/machine-id"
@@ -68,7 +68,7 @@ touch "${SYSROOT}/etc/machine-id"
 
 cat > "${SYSROOT}/etc/hosts" <<EOF
 127.0.0.1  localhost
-127.0.1.1  ${HOSTNAME}
+127.0.1.1  ${BOARD_HOSTNAME}
 ::1        localhost ip6-localhost ip6-loopback
 EOF
 
@@ -271,6 +271,6 @@ rm -f "${SYSROOT}/usr/bin/qemu-arm-static"
 
 echo ""
 echo "==> Rootfs configuration complete."
-echo "    HOSTNAME was: ${HOSTNAME}"
+echo "    HOSTNAME was: ${BOARD_HOSTNAME}"
 echo "    WIFI_SSID  was: ${WIFI_SSID:-<not set>}"
 echo "    Next step: sudo scripts/assemble-sd-image.sh"

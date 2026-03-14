@@ -50,8 +50,8 @@ echo ""
 
 # Export variables for sub-scripts
 export INSTALL_DOCKER="${INSTALL_DOCKER:-false}"
-# Force default hostname (ignore build machine's HOSTNAME)
-export HOSTNAME="cubieboard4"
+# Use BOARD_HOSTNAME to avoid conflict with shell's HOSTNAME variable
+export BOARD_HOSTNAME="cubieboard4"
 export WIFI_SSID="${WIFI_SSID:-}"
 export WIFI_PASSWORD="${WIFI_PASSWORD:-}"
 
