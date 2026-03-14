@@ -15,11 +15,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-KERNEL_VERSION="6.19"
+KERNEL_VERSION="6.18.18"
 KRELEASE="6"
 KERNEL_URL="https://www.kernel.org/pub/linux/kernel/v${KRELEASE}.x/linux-${KERNEL_VERSION}.tar.xz"
-# SHA256 of linux-6.19.tar.xz; leave empty to skip verification.
-# After first download, record it with: sha256sum build/sources/linux-6.19.tar.xz
+# SHA256 of linux-6.18.18.tar.xz; leave empty to skip verification.
+# After first download, record it with: sha256sum build/sources/linux-6.18.18.tar.xz
 KERNEL_SHA256=""
 
 # Set to false to skip applying patches (useful for testing upstream versions)

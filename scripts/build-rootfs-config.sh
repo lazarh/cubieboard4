@@ -145,7 +145,8 @@ fi
 # ── Load brcmfmac module ─────────────────────────────────────────────────
 
 if ! grep -q "^brcmfmac$" "${SYSROOT}/etc/modules" 2>/dev/null; then
-    echo "==> Adding brcmfmac to /etc/modules..."
+    echo "==> Adding brcmfmac and cfg80211 to /etc/modules..."
+    echo "cfg80211" >> "${SYSROOT}/etc/modules"
     echo "brcmfmac" >> "${SYSROOT}/etc/modules"
 else
     echo "    brcmfmac already in /etc/modules."
@@ -212,8 +213,9 @@ fi
 
 # ── Root password ────────────────────────────────────────────────────────
 
-echo "==> Root password set to 'root' (change after first boot!)"
-echo "root:root" | chroot "${SYSROOT}" chpasswd
+echo "==> Setting root password to 'root' (change after first boot!)"
+# Use chpasswd with SHA512 (default in Debian)
+chroot "${SYSROOT}" bash -c 'echo "root:root" | chpasswd'
 
 # ── WiFi pre-configuration ──────────────────────────────────────────────
 

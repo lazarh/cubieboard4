@@ -13,15 +13,12 @@
 #   MIRROR=...            — apt mirror (default: http://deb.debian.org/debian)
 #
 # Produces: debian-rootfs/ with packages installed
-# Caches:   build/sources/apt-cache/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SYSROOT="${REPO_ROOT}/debian-rootfs"
-SOURCES_DIR="${REPO_ROOT}/build/sources"
-APT_CACHE_DIR="${SOURCES_DIR}/apt-cache"
 
 SUITE="${SUITE:-trixie}"
 MIRROR="${MIRROR:-http://deb.debian.org/debian}"
@@ -44,8 +41,6 @@ if [[ ! -f "${SYSROOT}/usr/bin/qemu-arm-static" ]]; then
     cp /usr/bin/qemu-arm-static "${SYSROOT}/usr/bin/"
 fi
 
-mkdir -p "${APT_CACHE_DIR}"
-
 mount_chroot() {
     mount -t proc  proc     "${SYSROOT}/proc"
     mount -t sysfs sysfs    "${SYSROOT}/sys"
@@ -63,19 +58,6 @@ umount_chroot() {
 }
 
 trap umount_chroot EXIT
-
-# Configure apt cache to use local directory
-echo "==> Configuring apt to use local cache..."
-cat > "${SYSROOT}/etc/apt/apt.conf.d/99cache" <<EOF
-Acquire::http::Proxy "file://${APT_CACHE_DIR}";
-Dir::Cache::Archives "${APT_CACHE_DIR}";
-EOF
-
-# Copy cached debs from previous builds if available
-if [[ -d "${APT_CACHE_DIR}" && "$(ls -A "${APT_CACHE_DIR}" 2>/dev/null)" ]]; then
-    echo "    Restoring cached packages from ${APT_CACHE_DIR}..."
-    cp -a "${APT_CACHE_DIR}/"*.deb "${APT_CACHE_DIR}/" 2>/dev/null || true
-fi
 
 mount_chroot
 
@@ -100,7 +82,7 @@ else
         systemd-sysv dbus systemd-timesyncd \
         iproute2 iputils-ping iw wpasupplicant network-manager \
         openssh-server \
-        firmware-brcm80211 \
+        firmware-brcm80211 wireless-regdb \
         usbutils pciutils \
         vim-tiny less \
         util-linux e2fsprogs dosfstools parted \
@@ -133,15 +115,12 @@ EOF
         chroot "${SYSROOT}" systemctl enable containerd.service || true
     fi
 
-    # Clean apt cache and save .debs for future builds
-    echo "==> Saving package cache..."
-    mkdir -p "${APT_CACHE_DIR}"
-    cp -a "${SYSROOT}/var/cache/apt/archives/"*.deb "${APT_CACHE_DIR}/" 2>/dev/null || true
+    # Clean apt cache
     chroot "${SYSROOT}" apt-get clean
     rm -rf "${SYSROOT}/var/lib/apt/lists/"*
 
     touch "${PACKAGES_STAMP}"
-    echo "    Packages installed and cached."
+    echo "    Packages installed."
 fi
 
 echo ""

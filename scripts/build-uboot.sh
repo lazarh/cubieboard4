@@ -13,10 +13,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-UBOOT_VERSION="2026.01"
+UBOOT_VERSION="2025.01"
 UBOOT_URL="https://ftp.denx.de/pub/u-boot/u-boot-${UBOOT_VERSION}.tar.bz2"
-# SHA256 of u-boot-2026.01.tar.bz2; leave empty to skip verification.
-# After first download, record it with: sha256sum build/sources/u-boot-2026.01.tar.bz2
+# SHA256 of u-boot-2025.01.tar.bz2; leave empty to skip verification.
+# After first download, record it with: sha256sum build/sources/u-boot-2025.01.tar.bz2
 UBOOT_SHA256=""
 
 # Set to false to skip applying patches (useful for testing upstream versions)
