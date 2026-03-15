@@ -93,7 +93,7 @@ export QEMU_LD_PREFIX="${SYSROOT}"
     openssh \
     sudo \
     doas \
-    wpa-supplicant \
+    wpa_supplicant \
     iw \
     dhcpcd \
     dnsmasq \
@@ -118,10 +118,8 @@ export QEMU_LD_PREFIX="${SYSROOT}"
     wget \
     rsync \
     htop \
-    btop \
     tmux \
-    chrony \
-    rfkill
+    chrony
 
 # ── Install wireless firmware for brcmfmac (AP6330) ────────────────────────────
 
