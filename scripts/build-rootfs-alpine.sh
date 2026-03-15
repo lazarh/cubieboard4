@@ -76,9 +76,11 @@ cp -a "${SYSROOT}"/lib/* /lib/arm-linux-gnueabihf/ 2>/dev/null || true
 # ── Setup APK package manager ────────────────────────────────────────────────
 
 mkdir -p "${SYSROOT}/etc/apk"
+# Use v3.20 instead of v3.20.9 - armhf repos are only at major.minor level
+ALPINE_REPO_VERSION="${ALPINE_VERSION%.*}"
 cat > "${SYSROOT}/etc/apk/repositories" <<EOF
-https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main
-https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/community
+https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_REPO_VERSION}/main
+https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_REPO_VERSION}/community
 EOF
 
 # ── Install base packages ─────────────────────────────────────────────────────
