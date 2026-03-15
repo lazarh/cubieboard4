@@ -124,7 +124,7 @@ export QEMU_LD_PREFIX="${SYSROOT}"
 # ── Install wireless firmware for brcmfmac (AP6330) ────────────────────────────
 
 echo "==> Installing WiFi firmware..."
-"${APK}" add --no-cache linux-firmware-brcm
+"${SYSROOT}/sbin/apk" add --no-cache linux-firmware-brcm
 
 # ── Configure hostname ──────────────────────────────────────────────────────────
 
