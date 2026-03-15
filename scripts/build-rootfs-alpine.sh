@@ -23,7 +23,7 @@ SYSROOT="${REPO_ROOT}/alpine-rootfs"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 ARCH="armhf"
-ALPINE_VERSION="3.20"
+ALPINE_VERSION="3.20.9"
 ALPINE_MIRROR="https://dl-cdn.alpinelinux.org/alpine"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -43,6 +43,7 @@ echo "    Output: ${SYSROOT}"
 echo ""
 
 mkdir -p "${SYSROOT}"
+mkdir -p "${REPO_ROOT}/build/sources"
 
 # ── Download and extract Alpine mini rootfs ─────────────────────────────────────
 
