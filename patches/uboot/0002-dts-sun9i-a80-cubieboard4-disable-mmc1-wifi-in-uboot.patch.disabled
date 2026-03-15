@@ -1,0 +1,47 @@
+From: Cubieboard4 Build System <build@cubieboard4>
+Date: Fri, 7 Mar 2026 00:00:00 +0000
+Subject: [PATCH] dts: sun9i-a80-cubieboard4: disable mmc1 (WiFi SDIO) in U-Boot
+
+U-Boot does not use the BCM4330 WiFi chip, so there is no reason to
+bind mmc1 (mmc@1c10000, the SDIO host for WiFi) during boot.
+
+When mmc1 is enabled in the U-Boot DTS without explicit MMC aliases,
+the DM block layer assigns devnums by scan order:
+
+  mmc0 (SD,   mmc@1c0f000) -> devnum 0
+  mmc1 (WiFi, mmc@1c10000) -> devnum 1   <-- steals the slot eMMC needs
+  mmc2 (eMMC, mmc@1c11000) -> devnum 2
+
+However, sunxi board.c maps BOOT_DEVICE_MMC2 (eMMC) to
+mmc_get_env_dev()=1, so U-Boot looks for the boot partition on "mmc 1".
+With WiFi bound as devnum 1, this fails:
+
+  Loading Environment from FAT... ** Bad device specification mmc 1 **
+
+and distro_bootcmd falls through to PXE without ever scanning the
+eMMC, rendering eMMC installs unbootable.
+
+Disabling mmc1 removes it from DM binding, yielding:
+
+  mmc0 (SD,   mmc@1c0f000) -> devnum 0   (BOOT_DEVICE_MMC1 -> mmc 0)
+  mmc2 (eMMC, mmc@1c11000) -> devnum 1   (BOOT_DEVICE_MMC2 -> mmc 1)
+
+Both SD and eMMC boot paths now resolve to the correct block device.
+
+Signed-off-by: Cubieboard4 Build System <build@cubieboard4>
+---
+ arch/arm/dts/sun9i-a80-cubieboard4.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/sun9i-a80-cubieboard4.dts b/arch/arm/dts/sun9i-a80-cubieboard4.dts
+--- a/arch/arm/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/dts/sun9i-a80-cubieboard4.dts
+@@ -163,7 +163,7 @@
+ 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	non-removable;
+-	status = "okay";
++	status = "disabled";
+ };
+ 
+ &mmc1_pins {
