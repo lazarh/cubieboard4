@@ -59,17 +59,15 @@ fi
 echo "==> Extracting to ${SYSROOT}..."
 tar -xzf "${REPO_ROOT}/build/sources/${ALPINE_TARBALL}" -C "${SYSROOT}" --strip-components=1
 
-# ── Install apk-tools on build host ─────────────────────────────────────────────
+# ── Install qemu-user-static for running armhf binaries on x86_64 ──────────────────
 
-APK=""
-if ! command -v apk &> /dev/null; then
-    echo "==> Downloading apk-tools-static..."
-    wget -q -O /tmp/apk-tools.apk "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/apk-tools-static-3.22.0-r3.apk" || \
-    wget -q -O /tmp/apk-tools.apk "https://dl-cdn.alpinelinux.org/alpine/edge/main/x86_64/apk-tools-static-3.22.0-r3.apk"
-    mkdir -p /tmp/apk-tools && cd /tmp/apk-tools && tar -xf /tmp/apk-tools.apk
-    APK="/tmp/apk-tools/sbin/apk"
+if ! command -v qemu-arm-static &> /dev/null; then
+    echo "==> Installing qemu-user-static..."
+    apt-get update && apt-get install -y qemu-user-static || die "Failed to install qemu-user-static"
 fi
-APK="${APK:-apk}"
+
+# Copy qemu binary to rootfs for chroot
+cp /usr/bin/qemu-arm-static "${SYSROOT}/usr/bin/" 2>/dev/null || true
 
 # ── Setup APK package manager ────────────────────────────────────────────────
 
@@ -82,6 +80,7 @@ EOF
 # ── Install base packages ─────────────────────────────────────────────────────
 
 echo "==> Installing base packages..."
+APK="${SYSROOT}/sbin/apk"
 "${APK}" add --no-cache \
     alpine-base \
     openssh \
