@@ -69,6 +69,10 @@ fi
 # Copy qemu binary to rootfs for chroot
 cp /usr/bin/qemu-arm-static "${SYSROOT}/usr/bin/" 2>/dev/null || true
 
+# Copy musl libraries for qemu to find
+mkdir -p /lib/arm-linux-gnueabihf
+cp -a "${SYSROOT}"/lib/* /lib/arm-linux-gnueabihf/ 2>/dev/null || true
+
 # ── Setup APK package manager ────────────────────────────────────────────────
 
 mkdir -p "${SYSROOT}/etc/apk"
