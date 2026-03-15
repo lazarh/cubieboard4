@@ -1,24 +1,34 @@
 #!/bin/bash
-# build-rootfs-config.sh — Configure system settings in Debian rootfs.
+# build-rootfs-config.sh — Configure system settings in Debian/Alpine rootfs.
 #
 # Must be run as root on an x86-64 Debian/Ubuntu build host.
 #
 # Prerequisites:
-#   scripts/build-rootfs-debootstrap.sh must have been run
-#   scripts/build-rootfs-packages.sh should have been run
+#   build-rootfs-debootstrap.sh or build-rootfs-alpine.sh must have been run
+#   build-rootfs-packages.sh should have been run (Debian only)
 #
 # Environment variables:
+#   ROOTFS_DISTRO=debian|alpine — Choose rootfs distro (default: debian)
 #   BOARD_HOSTNAME=myboard — set board hostname (default: cubieboard4)
 #   WIFI_SSID=MyNetwork   — pre-configure WiFi (requires WIFI_PASSWORD)
 #   WIFI_PASSWORD=secret  — WPA2 passphrase for WIFI_SSID
 #
-# Produces: fully configured debian-rootfs/
+# Produces: debian-rootfs/ or alpine-rootfs/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SYSROOT="${REPO_ROOT}/debian-rootfs"
+
+ROOTFS_DISTRO="${ROOTFS_DISTRO:-debian}"
+case "${ROOTFS_DISTRO}" in
+    alpine)
+        SYSROOT="${REPO_ROOT}/alpine-rootfs"
+        ;;
+    debian|*)
+        SYSROOT="${REPO_ROOT}/debian-rootfs"
+        ;;
+esac
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 

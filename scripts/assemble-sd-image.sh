@@ -4,29 +4,42 @@
 # Prerequisites (run in order):
 #   1. scripts/build-uboot.sh
 #   2. scripts/build-kernel.sh
-#   3. sudo scripts/build-rootfs.sh
+#   3. sudo ROOTFS_DISTRO=debian|alpine scripts/build-rootfs.sh
 #
 # Must be run as root (loop device + mount).
 #
+# Environment variables:
+#   ROOTFS_DISTRO=debian|alpine — Choose rootfs distro (default: debian)
+#
 # Output:
-#   cubieboard4-debian13.img   (default uncompressed image path under repo root)
+#   cubieboard4-debian13.img   (default for Debian)
+#   cubieboard4-alpine.img     (default for Alpine)
 #   The script will also produce a compressed image (same path with .gz) and an
 #   optional .bmap file for use with bmaptool when available.
 #
 #   You can override the output image path by passing it as the first argument:
 #     sudo scripts/assemble-sd-image.sh /path/to/output.img
-#   If no argument is supplied the repository-default path is used.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-SYSROOT="${REPO_ROOT}/debian-rootfs"
+ROOTFS_DISTRO="${ROOTFS_DISTRO:-debian}"
+
+case "${ROOTFS_DISTRO}" in
+    alpine)
+        SYSROOT="${REPO_ROOT}/alpine-rootfs"
+        OUTPUT="${1:-${REPO_ROOT}/cubieboard4-alpine.img}"
+        ;;
+    debian|*)
+        SYSROOT="${REPO_ROOT}/debian-rootfs"
+        OUTPUT="${1:-${REPO_ROOT}/cubieboard4-debian13.img}"
+        ;;
+esac
+
 UBOOT_BUILD="${REPO_ROOT}/build/uboot"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
-# Allow overriding output image path via first argument
-OUTPUT="${1:-${REPO_ROOT}/cubieboard4-debian13.img}"
 
 BOOT_SIZE_MIB=80       # FAT boot partition size in MiB (40 MiB gap + 80 MiB = 120 MiB boundary)
 IMAGE_SIZE_MIB=3200    # Total image size (~3 GiB; grows to fill eMMC after install)
