@@ -59,6 +59,13 @@ fi
 echo "==> Extracting to ${SYSROOT}..."
 tar -xzf "${REPO_ROOT}/build/sources/${ALPINE_TARBALL}" -C "${SYSROOT}" --strip-components=1
 
+# ── Install apk-tools on build host if not present ───────────────────────────────
+
+if ! command -v apk &> /dev/null; then
+    echo "==> Installing apk-tools on build host..."
+    apt-get update && apt-get install -y apk-tools || die "Failed to install apk-tools"
+fi
+
 # ── Setup APK package manager ────────────────────────────────────────────────
 
 mkdir -p "${SYSROOT}/etc/apk"
