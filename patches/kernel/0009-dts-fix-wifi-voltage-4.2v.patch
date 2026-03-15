@@ -1,0 +1,59 @@
+From: CubieBoard4 Build <build@cubieboard4>
+Subject: [PATCH] dts: sun9i-a80-cubieboard4: Fix WiFi voltage to 4.2V for AP6330
+
+The AP6330 WiFi module requires 4.2V on DLDO1, not 3.3V as originally
+configured. Also re-enable vqmmc-supply for SDIO IO voltage and add
+pre-power-on-delay for proper PMIC stabilization.
+
+Signed-off-by: CubieBoard4 Build <build@cubieboard4>
+
+diff --git a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
+index 1234567..abcdefg 100644
+--- a/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/allwinner/sun9i-a80-cubieboard4.dts
+@@ -117,6 +117,8 @@
+ 		clocks = <&ac100_rtc 1>;
+ 		clock-names = "ext_clock";
+ 		post-power-on-delay-ms = <3000>;
++		/* Wait before enabling regulator - gives PMIC time to stabilize */
++		pre-power-on-delay-ms = <500>;
+ 		/* enables internal regulator and de-asserts reset */
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 WL-PMU-EN */
+ 	};
+@@ -163,7 +165,8 @@
+ 	vqmmc-supply = <&reg_cldo3>;
+ 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+-	max-frequency = <25000000>;
++	/* Lower frequency for more reliable initialization */
++	max-frequency = <10000000>;
+ 	non-removable;
+ 	status = "okay";
+ };
+@@ -288,14 +291,9 @@
+ 			};
+ 
+ 			reg_dldo1: dldo1 {
+-				/*
+-				 * The WiFi chip supports a wide range
+-				 * (3.0 ~ 4.8V) of voltages, and so does
+-				 * this regulator (3.0 ~ 4.2V), but
+-				 * Allwinner SDK always sets it to 3.3V.
+-				 */
+-				regulator-min-microvolt = <3300000>;
+-				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <500000>;
++				regulator-min-microvolt = <4200000>;
++				regulator-max-microvolt = <4200000>;
+ 				regulator-name = "vcc-wifi";
+ 			};
+ 
+@@ -429,7 +427,7 @@
+ 			};
+ 
+ 			reg_cldo3: cldo3 {
+-				regulator-enable-ramp-delay = <200000>;
++				regulator-enable-ramp-delay = <500000>;
+ 				regulator-min-microvolt = <3000000>;
+ 				regulator-max-microvolt = <3000000>;
+ 				regulator-name = "vcc-io-wifi-codec-io2";
