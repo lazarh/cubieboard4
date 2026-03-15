@@ -84,8 +84,9 @@ EOF
 # ── Install base packages ─────────────────────────────────────────────────────
 
 echo "==> Installing base packages..."
-APK="${SYSROOT}/sbin/apk"
-"${APK}" add --no-cache \
+# Run apk with QEMU - need to set up proper library path
+export QEMU_LD_PREFIX="${SYSROOT}"
+"${SYSROOT}/sbin/apk" add --no-cache --root "${SYSROOT}" \
     alpine-base \
     openssh \
     sudo \
