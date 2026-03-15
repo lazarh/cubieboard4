@@ -59,12 +59,17 @@ fi
 echo "==> Extracting to ${SYSROOT}..."
 tar -xzf "${REPO_ROOT}/build/sources/${ALPINE_TARBALL}" -C "${SYSROOT}" --strip-components=1
 
-# ── Install apk-tools on build host if not present ───────────────────────────────
+# ── Install apk-tools on build host ─────────────────────────────────────────────
 
+APK=""
 if ! command -v apk &> /dev/null; then
-    echo "==> Installing apk-tools on build host..."
-    apt-get update && apt-get install -y apk-tools || die "Failed to install apk-tools"
+    echo "==> Downloading apk-tools-static..."
+    wget -q -O /tmp/apk-tools.apk "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/apk-tools-static-3.22.0-r3.apk" || \
+    wget -q -O /tmp/apk-tools.apk "https://dl-cdn.alpinelinux.org/alpine/edge/main/x86_64/apk-tools-static-3.22.0-r3.apk"
+    mkdir -p /tmp/apk-tools && cd /tmp/apk-tools && tar -xf /tmp/apk-tools.apk
+    APK="/tmp/apk-tools/sbin/apk"
 fi
+APK="${APK:-apk}"
 
 # ── Setup APK package manager ────────────────────────────────────────────────
 
@@ -77,7 +82,7 @@ EOF
 # ── Install base packages ─────────────────────────────────────────────────────
 
 echo "==> Installing base packages..."
-apk --root "${SYSROOT}" add --no-cache \
+"${APK}" add --no-cache \
     alpine-base \
     openssh \
     sudo \
@@ -116,7 +121,7 @@ apk --root "${SYSROOT}" add --no-cache \
 # ── Install wireless firmware for brcmfmac (AP6330) ────────────────────────────
 
 echo "==> Installing WiFi firmware..."
-apk --root "${SYSROOT}" add --no-cache linux-firmware-brcm
+"${APK}" add --no-cache linux-firmware-brcm
 
 # ── Configure hostname ──────────────────────────────────────────────────────────
 
