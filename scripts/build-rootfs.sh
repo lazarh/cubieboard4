@@ -79,12 +79,12 @@ esac
 
 # Stage 2: Packages (Debian only)
 case "${ROOTFS_DISTRO}" in
-    debian|*)
-        echo ">>> [2/4] Running build-rootfs-packages.sh..."
-        "${SCRIPT_DIR}/build-rootfs-packages.sh"
-        ;;
     alpine)
         echo ">>> [2/4] Skipping package install (Alpine includes base packages)"
+        ;;
+    *)
+        echo ">>> [2/4] Running build-rootfs-packages.sh..."
+        "${SCRIPT_DIR}/build-rootfs-packages.sh"
         ;;
 esac
 
