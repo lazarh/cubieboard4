@@ -84,22 +84,31 @@ EOF
 
 # ── Locale ───────────────────────────────────────────────────────────────
 
-if ! grep -q "en_US.UTF-8 UTF-8" "${SYSROOT}/etc/locale.gen" 2>/dev/null; then
-    echo "==> Configuring locale..."
-    echo "en_US.UTF-8 UTF-8" >> "${SYSROOT}/etc/locale.gen"
-    chroot "${SYSROOT}" locale-gen
+# Alpine doesn't use locale-gen (uses musl)
+if [[ "${ROOTFS_DISTRO}" != "alpine" ]]; then
+    if ! grep -q "en_US.UTF-8 UTF-8" "${SYSROOT}/etc/locale.gen" 2>/dev/null; then
+        echo "==> Configuring locale..."
+        echo "en_US.UTF-8 UTF-8" >> "${SYSROOT}/etc/locale.gen"
+        chroot "${SYSROOT}" locale-gen
+    else
+        echo "    Locale already configured."
+    fi
 else
-    echo "    Locale already configured."
+    echo "    Skipping locale config (Alpine uses musl)"
 fi
 
 # ── Timezone ─────────────────────────────────────────────────────────────
 
-if [[ "$(cat "${SYSROOT}/etc/timezone" 2>/dev/null)" != "UTC" ]]; then
-    echo "==> Setting timezone to UTC..."
-    echo "UTC" > "${SYSROOT}/etc/timezone"
-    chroot "${SYSROOT}" dpkg-reconfigure -f noninteractive tzdata || true
+if [[ "${ROOTFS_DISTRO}" != "alpine" ]]; then
+    if [[ "$(cat "${SYSROOT}/etc/timezone" 2>/dev/null)" != "UTC" ]]; then
+        echo "==> Setting timezone to UTC..."
+        echo "UTC" > "${SYSROOT}/etc/timezone"
+        chroot "${SYSROOT}" dpkg-reconfigure -f noninteractive tzdata || true
+    else
+        echo "    Timezone already set to UTC."
+    fi
 else
-    echo "    Timezone already set to UTC."
+    echo "    Skipping timezone config (Alpine)"
 fi
 
 # ── /etc/fstab ──────────────────────────────────────────────────────────
