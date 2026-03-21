@@ -136,9 +136,15 @@ echo "==> Populating rootfs partition (rsync from ${SYSROOT})..."
 mkdir -p "${WORK_DIR}/root"
 mount "${LOOP_DEV}p2" "${WORK_DIR}/root"
 
-rsync -aAX "${SYSROOT}/" "${WORK_DIR}/root/"
+rsync -aAX \
+    --exclude=/proc/ \
+    --exclude=/sys/ \
+    --exclude=/dev/ \
+    --exclude=/run/ \
+    --exclude=/tmp/ \
+    "${SYSROOT}/" "${WORK_DIR}/root/"
 
-# Recreate empty pseudo-fs mountpoints
+# Recreate empty pseudo-fs mountpoints (excluded from rsync above)
 mkdir -p "${WORK_DIR}/root"/{proc,sys,dev,run,tmp}
 chmod 1777 "${WORK_DIR}/root/tmp"
 
