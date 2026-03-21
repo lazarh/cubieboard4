@@ -61,7 +61,7 @@ WORK_DIR=$(mktemp -d)
 trap cleanup EXIT
 
 [[ $EUID -eq 0 ]] || die "Must be run as root"
-[[ -d "${SYSROOT}" ]] || die "debian-rootfs/ not found — run scripts/build-rootfs.sh first"
+[[ -d "${SYSROOT}" ]] || die "${ROOTFS_DISTRO}-rootfs/ not found — run ROOTFS_DISTRO=${ROOTFS_DISTRO} scripts/build-rootfs.sh first"
 
 # ── Locate artifacts ───────────────────────────────────────────────────────
 
