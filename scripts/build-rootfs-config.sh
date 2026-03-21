@@ -121,7 +121,9 @@ EOF
 
 # ── Serial console ──────────────────────────────────────────────────────
 
-if [[ ! -L "${SYSROOT}/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service" ]]; then
+if [[ "${ROOTFS_DISTRO}" == "alpine" ]]; then
+    echo "    Skipping serial console enable (already configured by build-rootfs-alpine.sh)"
+elif [[ ! -L "${SYSROOT}/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service" ]]; then
     echo "==> Enabling serial console..."
     chroot "${SYSROOT}" systemctl enable serial-getty@ttyS0.service || true
 else
@@ -134,14 +136,18 @@ if ! grep -q "^PermitRootLogin yes" "${SYSROOT}/etc/ssh/sshd_config" 2>/dev/null
     echo "==> Configuring sshd..."
     sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' "${SYSROOT}/etc/ssh/sshd_config"
     sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' "${SYSROOT}/etc/ssh/sshd_config"
-    chroot "${SYSROOT}" systemctl enable ssh.service || true
+    if [[ "${ROOTFS_DISTRO}" != "alpine" ]]; then
+        chroot "${SYSROOT}" systemctl enable ssh.service || true
+    fi
 else
     echo "    SSH already configured."
 fi
 
 # ── NTP ───────────────────────────────────────────────────────────────────
 
-if [[ ! -L "${SYSROOT}/etc/systemd/system/systemd-timesyncd.service" ]]; then
+if [[ "${ROOTFS_DISTRO}" == "alpine" ]]; then
+    echo "    Skipping NTP enable (chrony managed by OpenRC via build-rootfs-alpine.sh)"
+elif [[ ! -L "${SYSROOT}/etc/systemd/system/systemd-timesyncd.service" ]]; then
     echo "==> Enabling NTP..."
     chroot "${SYSROOT}" systemctl enable systemd-timesyncd.service || true
 else
@@ -222,6 +228,7 @@ fi
 
 if [[ ! -f "${SYSROOT}/usr/local/sbin/install-to-emmc.sh" ]]; then
     echo "==> Embedding install-to-emmc.sh..."
+    mkdir -p "${SYSROOT}/usr/local/sbin"
     install -m 0755 "${SCRIPT_DIR}/install-to-emmc.sh" \
         "${SYSROOT}/usr/local/sbin/install-to-emmc.sh"
 else
@@ -251,7 +258,9 @@ chroot "${SYSROOT}" bash -c 'echo "root:root" | chpasswd'
 # ── WiFi pre-configuration ──────────────────────────────────────────────
 
 NM_DIR="${SYSROOT}/etc/NetworkManager/system-connections"
-if [[ -n "${WIFI_SSID}" && -n "${WIFI_PASSWORD}" ]]; then
+if [[ "${ROOTFS_DISTRO}" == "alpine" ]]; then
+    echo "    Skipping NetworkManager WiFi config (Alpine uses wpa_supplicant)"
+elif [[ -n "${WIFI_SSID}" && -n "${WIFI_PASSWORD}" ]]; then
     if [[ -f "${NM_DIR}/wifi-preconfigured.nmconnection" ]]; then
         echo "==> WiFi already pre-configured (skipping)."
     else
