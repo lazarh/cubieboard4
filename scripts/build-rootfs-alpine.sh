@@ -177,6 +177,27 @@ denyinterfaces dummy* lo
 timeout 30
 EOF
 
+# chrony: allow large initial time step (board starts from 1970 with dead RTC)
+# and sync time back to the hardware RTC after synchronisation.
+mkdir -p "${SYSROOT}/etc/chrony"
+cat > "${SYSROOT}/etc/chrony/chrony.conf" <<'EOF'
+# NTP pools
+pool pool.ntp.org iburst
+
+# Step the clock on the first update if offset > 1s (no limit on magnitude).
+# Without this, chrony won't fix a 1970 clock.
+makestep 1.0 -1
+
+# Write time to the hardware RTC after each sync so it survives reboots.
+rtcsync
+
+# Allow the local clock to be used as a fallback.
+local stratum 10
+
+# Save clock drift across reboots.
+driftfile /var/lib/chrony/drift
+EOF
+
 # ── WiFi configuration ─────────────────────────────────────────────────────────
 
 if [[ -n "${WIFI_SSID}" ]]; then
