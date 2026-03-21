@@ -94,10 +94,13 @@ fallocate -l "${IMAGE_SIZE_MIB}MiB" "${OUTPUT}"
 # ── Partition ──────────────────────────────────────────────────────────────
 
 echo "==> Partitioning..."
-parted -s "${OUTPUT}" mklabel msdos
-# Leave first 40 MiB for U-Boot SPL (raw at 8 KiB offset, well within 40 MiB)
-parted -s "${OUTPUT}" mkpart primary fat32 40MiB $((40 + BOOT_SIZE_MIB))MiB
-parted -s "${OUTPUT}" mkpart primary ext4  $((40 + BOOT_SIZE_MIB))MiB 100%
+# Use sfdisk (no dependency on parted): leave first 40 MiB for raw U-Boot,
+# then 80 MiB FAT for /boot, rest ext4 for rootfs.
+sfdisk --no-reread "${OUTPUT}" <<SFDISK_EOF
+label: dos
+40MiB,${BOOT_SIZE_MIB}MiB,0c
+$((40 + BOOT_SIZE_MIB))MiB,,83
+SFDISK_EOF
 
 # ── Attach loop device ─────────────────────────────────────────────────────
 

@@ -114,6 +114,7 @@ export QEMU_LD_PREFIX="${SYSROOT}"
     wpa_supplicant \
     iw \
     dhcpcd \
+    openresolv \
     dnsmasq \
     bash \
     coreutils \
@@ -172,6 +173,10 @@ cat > "${SYSROOT}/etc/dhcpcd.conf" <<'EOF'
 # CubieBoard4 dhcpcd configuration
 # Ignore virtual interfaces
 denyinterfaces dummy* lo
+
+# Explicitly request DNS and domain from DHCP server
+option domain_name_servers, domain_name, domain_search, host_name
+option classless_static_routes, ntp_servers
 
 # Fast link detection
 timeout 30
