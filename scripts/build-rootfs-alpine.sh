@@ -95,6 +95,12 @@ https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_REPO_VERSION}/community
 EOF
 # Allow rauc to be pulled from edge/testing without upgrading everything else
 
+# Pre-create /etc/machine-id — dbus post-install rejects an empty file.
+# A first-boot service will regenerate a unique ID per device.
+mkdir -p "${SYSROOT}/etc"
+od -vN 16 -A n -t x1 /dev/urandom | tr -d ' \n' | head -c 32 > "${SYSROOT}/etc/machine-id"
+echo >> "${SYSROOT}/etc/machine-id"
+
 # ── Install base packages ─────────────────────────────────────────────────────
 
 echo "==> Installing base packages..."
@@ -294,6 +300,35 @@ chmod +x "${SYSROOT}/etc/init.d/rauc-mark-good"
 ln -sf /etc/init.d/rauc-mark-good \
     "${SYSROOT}/etc/runlevels/default/rauc-mark-good"
 echo "    rauc-mark-good OpenRC service installed."
+
+# OpenRC service: regenerate a unique machine-id on first boot.
+# The build-time machine-id is a placeholder; each device gets its own.
+cat > "${SYSROOT}/etc/init.d/machine-id" <<'INITEOF'
+#!/sbin/openrc-run
+
+description="Regenerate unique machine-id on first boot"
+
+depend() {
+    before dbus
+    before networking
+}
+
+start() {
+    ebegin "Checking machine-id"
+    if [ ! -s /run/machine-id-committed ]; then
+        dbus-uuidgen > /etc/machine-id.new \
+            && mv /etc/machine-id.new /etc/machine-id \
+            && touch /run/machine-id-committed
+        einfo "New machine-id: $(cat /etc/machine-id)"
+    else
+        einfo "machine-id already set: $(cat /etc/machine-id)"
+    fi
+    eend 0
+}
+INITEOF
+chmod +x "${SYSROOT}/etc/init.d/machine-id"
+ln -sf /etc/init.d/machine-id "${SYSROOT}/etc/runlevels/boot/machine-id"
+echo "    machine-id first-boot service installed."
 
 # ── Create default user ────────────────────────────────────────────────────────
 
