@@ -48,7 +48,8 @@ mkdir -p "${REPO_ROOT}/build/sources"
 # ── Download and extract Alpine mini rootfs ─────────────────────────────────────
 
 ALPINE_TARBALL="alpine-minirootfs-${ALPINE_VERSION}-${ARCH}.tar.gz"
-ALPINE_URL="${ALPINE_MIRROR}/v${ALPINE_VERSION}/releases/${ARCH}/${ALPINE_TARBALL}"
+ALPINE_RELEASE_DIR="${ALPINE_VERSION%.*}"   # e.g. 3.20 from 3.20.9
+ALPINE_URL="${ALPINE_MIRROR}/v${ALPINE_RELEASE_DIR}/releases/${ARCH}/${ALPINE_TARBALL}"
 ALPINE_CACHED="${REPO_ROOT}/build/sources/${ALPINE_TARBALL}"
 
 echo "==> Downloading Alpine minirootfs..."
