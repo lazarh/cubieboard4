@@ -206,30 +206,15 @@ EOF
 fi
 
 # ── Configure serial console ───────────────────────────────────────────────────
+# Alpine uses busybox init with /etc/inittab (not systemd/OpenRC for getty).
+# The ttyS0 line exists but is commented out; uncomment it.
 
 echo "==> Configuring serial console..."
-mkdir -p "${SYSROOT}/etc/init.d"
-cat > "${SYSROOT}/etc/init.d/serial" <<EOF
-#!/bin/sh
-NAME=serial
-DESC="Serial console"
-
-start() {
-    echo "Starting serial console..."
-    getty -L 115200 ttyS0 vt100 &
-}
-
-stop() {
-    true
-}
-
-case "\$1" in
-    start) start ;;
-    stop) stop ;;
-    *) echo "Usage: \$0 {start|stop}" ;;
-esac
-EOF
-chmod +x "${SYSROOT}/etc/init.d/serial"
+if grep -q '^#.*ttyS0.*getty' "${SYSROOT}/etc/inittab" 2>/dev/null; then
+    sed -i 's|^#\(.*ttyS0.*getty.*\)|\1|' "${SYSROOT}/etc/inittab"
+elif ! grep -q '^ttyS0' "${SYSROOT}/etc/inittab" 2>/dev/null; then
+    echo "ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100" >> "${SYSROOT}/etc/inittab"
+fi
 
 # ── Configure fstab (disable fsck for vfat) ───────────────────────────────────────
 
@@ -249,9 +234,8 @@ chroot "${SYSROOT}" /bin/sh -c "echo 'root:cubie' | chpasswd"
 
 echo "==> Enabling services..."
 mkdir -p "${SYSROOT}/etc/runlevels/default"
-ln -sf /etc/init.d/Networking "${SYSROOT}/etc/runlevels/default/networking"
+ln -sf /etc/init.d/networking "${SYSROOT}/etc/runlevels/default/networking"
 ln -sf /etc/init.d/dhcpcd "${SYSROOT}/etc/runlevels/default/dhcpcd"
-ln -sf /etc/init.d/serial "${SYSROOT}/etc/runlevels/default/serial"
 ln -sf /etc/init.d/sshd "${SYSROOT}/etc/runlevels/default/sshd"
 
 # ── RAUC configuration ──────────────────────────────────────────────────────────
