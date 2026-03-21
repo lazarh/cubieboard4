@@ -128,6 +128,10 @@ mount "${LOOP_DEV}p1" "${WORK_DIR}/boot"
 cp "${KERNEL}"   "${WORK_DIR}/boot/zImage"
 cp "${DTB}"      "${WORK_DIR}/boot/sun9i-a80-cubieboard4.dtb"
 cp "${BOOT_SCR}" "${WORK_DIR}/boot/boot.scr"
+# RAUC A/B boot script for eMMC — install-to-emmc.sh copies this as boot.scr on eMMC
+RAUC_SCR="${UBOOT_BUILD}/boot.scr"
+[[ "${BOOT_SCR}" != "${RAUC_SCR}" && -f "${RAUC_SCR}" ]] && \
+    cp "${RAUC_SCR}" "${WORK_DIR}/boot/boot-rauc.scr"
 # U-Boot binary also goes to /boot so install-to-emmc.sh can find it at runtime
 cp "${UBOOT_BIN}" "${WORK_DIR}/boot/u-boot-sunxi-with-spl.bin"
 
