@@ -100,12 +100,14 @@ cat > "${ENV_TMP}.txt" <<'EOF'
 BOOT_ORDER=A B
 BOOT_A_LEFT=3
 BOOT_B_LEFT=3
+bootdelay=2
+bootcmd=if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd
 EOF
 mkenvimage -s "${UBOOT_ENV_SIZE}" -o "${ENV_TMP}" "${ENV_TMP}.txt"
 dd if="${ENV_TMP}" of="${EMMC}" \
     bs=512 seek=$(( UBOOT_ENV_OFFSET / 512 )) conv=fsync 2>/dev/null
 rm -f "${ENV_TMP}" "${ENV_TMP}.txt"
-echo "    RAUC env written (BOOT_ORDER='A B', BOOT_A_LEFT=3, BOOT_B_LEFT=3)"
+echo "    RAUC env written (BOOT_ORDER='A B', bootcmd set, bootdelay=2)"
 
 # ── Mount target partitions ─────────────────────────────────────────────────
 
