@@ -239,10 +239,29 @@ chroot "${SYSROOT}" /bin/sh -c "echo 'root:cubie' | chpasswd"
 # ── Enable services ────────────────────────────────────────────────────────────
 
 echo "==> Enabling services..."
+
+# sysinit — kernel interfaces and device manager
+mkdir -p "${SYSROOT}/etc/runlevels/sysinit"
+for svc in devfs dmesg hwdrivers mdev seedrng; do
+    [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
+        ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/sysinit/${svc}"
+done
+
+# boot — filesystem remount (rw), hostname, modules, misc
+mkdir -p "${SYSROOT}/etc/runlevels/boot"
+for svc in sysfs procfs fsck localmount modules swap sysctl bootmisc hostname klogd; do
+    [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
+        ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/boot/${svc}"
+done
+
+# default — user-space services
 mkdir -p "${SYSROOT}/etc/runlevels/default"
-ln -sf /etc/init.d/networking "${SYSROOT}/etc/runlevels/default/networking"
-ln -sf /etc/init.d/dhcpcd "${SYSROOT}/etc/runlevels/default/dhcpcd"
-ln -sf /etc/init.d/sshd "${SYSROOT}/etc/runlevels/default/sshd"
+for svc in networking dhcpcd sshd chronyd dbus; do
+    [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
+        ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/default/${svc}"
+done
+# Remove dangling serial symlink added by agetty-openrc post-install
+rm -f "${SYSROOT}/etc/runlevels/default/serial"
 
 # ── RAUC configuration ──────────────────────────────────────────────────────────
 

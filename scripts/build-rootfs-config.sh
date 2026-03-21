@@ -192,24 +192,27 @@ else
 fi
 
 # ── BCM4330 WiFi firmware symlinks ──────────────────────────────────────
+# Alpine stores firmware in /lib/firmware (not /usr/lib/firmware)
 
-BRCM_DIR="${SYSROOT}/usr/lib/firmware/brcm"
+BRCM_DIR="${SYSROOT}/lib/firmware/brcm"
 mkdir -p "${BRCM_DIR}"
 if [[ -f "${BRCM_DIR}/brcmfmac4330-sdio.Prowise-PT301.txt" ]]; then
-    if [[ ! -L "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.txt" ]]; then
-        echo "==> Creating BCM4330 firmware symlinks..."
-        ln -sf brcmfmac4330-sdio.Prowise-PT301.txt \
-            "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.txt"
-        for ext in bin clm_blob txcap_blob; do
-            if [[ -f "${BRCM_DIR}/brcmfmac4330-sdio.${ext}" ]]; then
-                ln -sf "brcmfmac4330-sdio.${ext}" "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.${ext}"
-            fi
-        done
-    else
-        echo "    BCM4330 firmware symlinks already exist."
-    fi
+    echo "==> Creating BCM4330 firmware symlinks..."
+    # Generic NVRAM name — tried by driver after board-specific names fail
+    ln -sf brcmfmac4330-sdio.Prowise-PT301.txt \
+        "${BRCM_DIR}/brcmfmac4330-sdio.txt"
+    # Board-specific name based on DTB compatible string
+    ln -sf brcmfmac4330-sdio.Prowise-PT301.txt \
+        "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.txt"
+    for ext in bin clm_blob txcap_blob; do
+        if [[ -f "${BRCM_DIR}/brcmfmac4330-sdio.${ext}" ]]; then
+            ln -sf "brcmfmac4330-sdio.${ext}" \
+                "${BRCM_DIR}/brcmfmac4330-sdio.cubietech,a80-cubieboard4.${ext}"
+        fi
+    done
+    echo "    BCM4330 firmware symlinks created."
 else
-    echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found."
+    echo "    WARNING: brcmfmac4330-sdio.Prowise-PT301.txt not found in ${BRCM_DIR}"
 fi
 
 # ── Fix regulatory.db - replace symlinks with actual files ───────────────────
