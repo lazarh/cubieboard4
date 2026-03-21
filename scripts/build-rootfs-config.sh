@@ -118,6 +118,7 @@ cat > "${SYSROOT}/etc/fstab" <<EOF
 /dev/mmcblk0p1  /boot  vfat  defaults          0  2
 tmpfs           /tmp   tmpfs defaults,nosuid,nodev  0 0
 EOF
+mkdir -p "${SYSROOT}/boot"
 
 # ── Serial console ──────────────────────────────────────────────────────
 
@@ -241,6 +242,7 @@ UBOOT_BIN="${REPO_ROOT}/build/uboot/u-boot-sunxi-with-spl.bin"
 if [[ -f "${UBOOT_BIN}" ]]; then
     if [[ ! -f "${SYSROOT}/boot/u-boot-sunxi-with-spl.bin" ]]; then
         echo "==> Copying U-Boot to /boot..."
+        mkdir -p "${SYSROOT}/boot"
         install -m 0644 "${UBOOT_BIN}" "${SYSROOT}/boot/u-boot-sunxi-with-spl.bin"
     else
         echo "    U-Boot already in /boot."
