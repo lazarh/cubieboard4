@@ -379,6 +379,53 @@ chmod +x "${SYSROOT}/etc/init.d/machine-id"
 ln -sf /etc/init.d/machine-id "${SYSROOT}/etc/runlevels/boot/machine-id"
 echo "    machine-id first-boot service installed."
 
+# OpenRC service: resize root partition to fill the SD card on first boot.
+# Uses sfdisk to extend p2 to end of disk, then resize2fs for online ext4 resize.
+# Skipped automatically on eMMC (mmcblk2p2) and on subsequent boots.
+cat > "${SYSROOT}/etc/init.d/resize-rootfs" <<'INITEOF'
+#!/sbin/openrc-run
+
+description="Resize root partition to fill SD card on first boot"
+
+depend() {
+    after localmount
+    before networking
+    keyword -shutdown
+}
+
+start() {
+    local done_flag="/etc/resize-rootfs.done"
+
+    [ -f "${done_flag}" ] && { einfo "Root resize already done, skipping."; return 0; }
+
+    local rootdev
+    rootdev=$(findmnt -n -o SOURCE /)
+
+    # Only extend the SD card root (mmcblk0p2); skip eMMC and others.
+    if [ "${rootdev}" != "/dev/mmcblk0p2" ]; then
+        einfo "Root is ${rootdev}, not SD mmcblk0p2 — skipping resize."
+        touch "${done_flag}"
+        return 0
+    fi
+
+    ebegin "Extending /dev/mmcblk0p2 to fill SD card"
+    # ', +' tells sfdisk: keep partition start, extend to end of disk.
+    echo ", +" | sfdisk --no-reread --force -N 2 /dev/mmcblk0 >/dev/null 2>&1
+    partx -u /dev/mmcblk0 2>/dev/null || true
+    eend $? "Failed to resize partition" || return 1
+
+    ebegin "Resizing ext4 filesystem on /dev/mmcblk0p2"
+    resize2fs /dev/mmcblk0p2 >/dev/null 2>&1
+    eend $? "Failed to resize filesystem" || return 1
+
+    touch "${done_flag}"
+    einfo "Root partition resized successfully."
+}
+INITEOF
+chmod +x "${SYSROOT}/etc/init.d/resize-rootfs"
+ln -sf /etc/init.d/resize-rootfs "${SYSROOT}/etc/runlevels/boot/resize-rootfs"
+echo "    resize-rootfs first-boot service installed."
+
 # ── Create default user ────────────────────────────────────────────────────────
 
 echo "==> Creating default user..."
