@@ -184,13 +184,30 @@ make -C "${UBOOT_SRC}" \
     O="${BUILD_DIR}" \
     Cubieboard4_defconfig
 
-# Override bootcmd: try eMMC (mmc 1) directly first, before any distro scan
-# probes mmc0.  On A80 the voltage-select failure for a plain SD card
-# corrupts the shared mmc_config_clk state and prevents eMMC init.
-# Booting eMMC directly avoids touching mmc0 entirely.
-# Fall back to distro_bootcmd for initial SD-card installs.
+# Merge RAUC config fragment (switches ENV_IS_IN_FAT → ENV_IS_IN_MMC at 4MiB).
+# U-Boot's merge_config.sh is available in the source tree.
+echo "==> Merging RAUC U-Boot config fragment..."
+MERGE_SCRIPT="${UBOOT_SRC}/scripts/kconfig/merge_config.sh"
+if [[ -f "${MERGE_SCRIPT}" ]]; then
+    KCONFIG_CONFIG="${BUILD_DIR}/.config" \
+        "${MERGE_SCRIPT}" -m -O "${BUILD_DIR}" \
+        "${BUILD_DIR}/.config" \
+        "${REPO_ROOT}/configs/uboot/rauc.config"
+    make -C "${UBOOT_SRC}" \
+        ARCH="${ARCH}" \
+        CROSS_COMPILE="${CROSS_COMPILE}" \
+        O="${BUILD_DIR}" \
+        olddefconfig
+else
+    # Fallback: append fragment and let syncconfig resolve conflicts
+    cat "${REPO_ROOT}/configs/uboot/rauc.config" >> "${BUILD_DIR}/.config"
+fi
+
+# Compile the RAUC boot script so U-Boot loads it and executes RAUC A/B logic.
+# The BOOTCOMMAND just runs the script; slot selection is inside boot-emmc-rauc.cmd.
+# Fall back to distro_bootcmd for initial SD-card installs (when mmc 1 is absent).
 cat >> "${BUILD_DIR}/.config" << 'UBOOT_CFG'
-CONFIG_BOOTCOMMAND="if mmc dev 1 && load mmc 1:1 ${fdt_addr_r} ${fdtfile}; then if load mmc 1:1 ${kernel_addr_r} zImage || load mmc 1:1 ${kernel_addr_r} boot/zImage; then setenv bootargs console=ttyS0,115200 console=tty1 root=/dev/mmcblk2p2 rootwait panic=10 ${extra}; bootz ${kernel_addr_r} - ${fdt_addr_r}; fi; fi; run distro_bootcmd"
+CONFIG_BOOTCOMMAND="if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd"
 UBOOT_CFG
 
 # ── Build ──────────────────────────────────────────────────────────────────
@@ -204,13 +221,23 @@ make -C "${UBOOT_SRC}" \
 
 echo "==> U-Boot binary: ${BUILD_DIR}/u-boot-sunxi-with-spl.bin"
 
-# ── Generate boot.scr ──────────────────────────────────────────────────────
+# ── Generate boot scripts ──────────────────────────────────────────────────
 
-echo "==> Generating boot.scr from boot/boot.cmd..."
+# RAUC eMMC boot script (A/B slot selection) — used by the BOOTCOMMAND above
+echo "==> Generating boot.scr from boot/boot-emmc-rauc.cmd (RAUC A/B)..."
 mkimage -C none -A arm -T script \
-    -d "${REPO_ROOT}/boot/boot.cmd" \
+    -d "${REPO_ROOT}/boot/boot-emmc-rauc.cmd" \
     "${BUILD_DIR}/boot.scr"
-echo "==> Boot script: ${BUILD_DIR}/boot.scr"
+echo "==> Boot script (RAUC): ${BUILD_DIR}/boot.scr"
+
+# SD-card single-slot boot script (used by assemble-sd-image.sh for bootstrap)
+echo "==> Generating boot-sd.scr from boot/boot-sd.cmd (SD bootstrap)..."
+if [[ -f "${REPO_ROOT}/boot/boot-sd.cmd" ]]; then
+    mkimage -C none -A arm -T script \
+        -d "${REPO_ROOT}/boot/boot-sd.cmd" \
+        "${BUILD_DIR}/boot-sd.scr"
+    echo "==> Boot script (SD): ${BUILD_DIR}/boot-sd.scr"
+fi
 
 echo ""
 echo "==> U-Boot build complete."

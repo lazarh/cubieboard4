@@ -3,3 +3,8 @@ debian-rootfs/
 *.img
 *.img.gz
 *.img.gz.bmap
+
+# RAUC signing key — never commit the private key
+configs/rauc/dev-cert/ca.key.pem
+# RAUC update bundles
+*.raucb

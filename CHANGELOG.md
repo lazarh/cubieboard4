@@ -4,6 +4,88 @@ All notable changes to this project are documented here.
 
 ---
 
+## feature/rauc (in progress)
+
+### Added — RAUC A/B OTA update support
+
+Added full [RAUC](https://rauc.io/) over-the-air update infrastructure for
+CubieBoard4 (Alpine Linux, mainline kernel, U-Boot 2024.01).
+
+#### Partition layout change (eMMC)
+
+The eMMC now uses a 3-partition A/B layout to support atomic, rollback-safe updates:
+
+```
+raw @ 8KB      U-Boot SPL + u-boot.img
+raw @ 4MiB     U-Boot env (128KB, raw MMC — replaces FAT uboot.env)
+/dev/mmcblk2p1  80MiB FAT   /boot   (shared: zImage, DTB, boot.scr)
+/dev/mmcblk2p2  ~3.3GiB ext4  rootfsA  (RAUC slot A — active after install)
+/dev/mmcblk2p3  ~3.3GiB ext4  rootfsB  (RAUC slot B — populated by first OTA)
+```
+
+**Note**: This requires a full eMMC reflash. Run `install-to-emmc.sh` from a
+freshly flashed SD card to apply the new layout.
+
+#### Update flow
+
+```
+# On build host — create a signed update bundle:
+sudo VERSION=20240101 scripts/build-rauc-bundle.sh
+
+# Serve it from any HTTP server, then on the board:
+rauc install https://your-server/cubieboard4-20240101.raucb
+reboot
+
+# After successful boot, mark the new slot good (or rollback will trigger):
+rauc status mark-good
+# (The rauc-mark-good OpenRC service runs this automatically on each boot)
+```
+
+#### New files
+
+| File | Purpose |
+|------|---------|
+| `configs/rauc/system.conf` | RAUC slot definitions (bootloader=uboot, slots A+B) |
+| `configs/rauc/dev-cert/generate.sh` | Certificate generation helper |
+| `configs/rauc/dev-cert/ca.cert.pem` | Public CA certificate (deployed to board) |
+| `configs/uboot/rauc.config` | U-Boot Kconfig: raw MMC env at 4MiB |
+| `boot/boot-emmc-rauc.cmd` | RAUC-aware U-Boot boot script (A/B slot selection) |
+| `scripts/gen-rauc-cert.sh` | Generate dev CA keypair (run once) |
+| `scripts/build-rauc-bundle.sh` | Create signed `.raucb` update bundle |
+
+#### Modified files
+
+- `scripts/build-uboot.sh` — merges `configs/uboot/rauc.config`; generates `boot.scr` from RAUC script; generates `boot-sd.scr` from SD single-slot script
+- `scripts/build-rootfs-alpine.sh` — installs `rauc` + `uboot-tools`; deploys `system.conf` + `ca.cert.pem`; installs `rauc-mark-good` OpenRC service; writes `/etc/fw_env.config`
+- `scripts/assemble-sd-image.sh` — uses `boot-sd.scr` for the SD bootstrap image
+- `scripts/install-to-emmc.sh` — creates 3-partition A/B layout; initialises RAUC U-Boot env via `mkenvimage`
+- `configs/kernel/cubieboard4.config` — adds `CONFIG_SQUASHFS=y` (RAUC bundle extraction)
+- `.gitignore` — ignores `ca.key.pem` (private key) and `*.raucb` bundles
+
+#### Initial setup (first time)
+
+```bash
+# 1. Generate the signing certificate (once per developer/device)
+scripts/gen-rauc-cert.sh
+
+# 2. Build everything
+scripts/build-uboot.sh
+scripts/build-kernel.sh
+sudo ROOTFS_DISTRO=alpine scripts/build-rootfs.sh
+
+# 3. Create SD bootstrap image
+sudo ROOTFS_DISTRO=alpine scripts/assemble-sd-image.sh
+
+# 4. Flash SD card and boot
+# 5. On the board, run:
+install-to-emmc.sh
+# 6. Remove SD card, reboot from eMMC
+# 7. Verify RAUC:
+rauc status
+```
+
+---
+
 ## 2026-03-07
 
 ### Fixed — WiFi (BCM4330/brcmfmac) not initializing on mmc1

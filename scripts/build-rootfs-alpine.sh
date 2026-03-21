@@ -119,7 +119,9 @@ export QEMU_LD_PREFIX="${SYSROOT}"
     rsync \
     htop \
     tmux \
-    chrony
+    chrony \
+    rauc \
+    uboot-tools
 
 # ── Install wireless firmware for brcmfmac (AP6330) ────────────────────────────
 
@@ -217,6 +219,20 @@ esac
 EOF
 chmod +x "${SYSROOT}/etc/init.d/serial"
 
+# ── Configure fstab (disable fsck for vfat) ───────────────────────────────────────
+
+echo "==> Configuring fstab..."
+cat > "${SYSROOT}/etc/fstab" <<EOF
+/dev/mmcblk0p1  /boot   vfat    noauto,noatime          0 0
+/dev/mmcblk0p2  /       ext4    defaults,noatime         0 0
+tmpfs           /tmp    tmpfs   defaults,noatime         0 0
+EOF
+
+# ── Set root password ────────────────────────────────────────────────────────────
+
+echo "==> Setting root password..."
+chroot "${SYSROOT}" /bin/sh -c "echo 'root:cubie' | chpasswd"
+
 # ── Enable services ────────────────────────────────────────────────────────────
 
 echo "==> Enabling services..."
@@ -226,11 +242,67 @@ ln -sf /etc/init.d/dhcpcd "${SYSROOT}/etc/runlevels/default/dhcpcd"
 ln -sf /etc/init.d/serial "${SYSROOT}/etc/runlevels/default/serial"
 ln -sf /etc/init.d/sshd "${SYSROOT}/etc/runlevels/default/sshd"
 
+# ── RAUC configuration ──────────────────────────────────────────────────────────
+
+echo "==> Installing RAUC configuration..."
+mkdir -p "${SYSROOT}/etc/rauc"
+
+# Deploy system.conf from repo
+cp "${REPO_ROOT}/configs/rauc/system.conf" "${SYSROOT}/etc/rauc/system.conf"
+
+# Deploy CA certificate if it exists (must be generated first with gen-rauc-cert.sh)
+RAUC_CERT="${REPO_ROOT}/configs/rauc/dev-cert/ca.cert.pem"
+if [[ -f "${RAUC_CERT}" ]]; then
+    cp "${RAUC_CERT}" "${SYSROOT}/etc/rauc/ca.cert.pem"
+    echo "    Installed RAUC CA certificate."
+else
+    echo "    WARNING: ${RAUC_CERT} not found."
+    echo "    Run scripts/gen-rauc-cert.sh to generate the dev certificate,"
+    echo "    then re-run this script (or copy ca.cert.pem to /etc/rauc/ manually)."
+fi
+
+# fw_env.config: tells fw_printenv/fw_setenv where U-Boot env lives on eMMC.
+# Must match CONFIG_ENV_OFFSET / CONFIG_ENV_SIZE in configs/uboot/rauc.config.
+# /dev/mmcblk2 is the eMMC on CubieBoard4 (present only after install-to-emmc.sh).
+mkdir -p "${SYSROOT}/etc"
+cat > "${SYSROOT}/etc/fw_env.config" <<'EOF'
+# Device        Offset      Env-size
+# CubieBoard4 eMMC (/dev/mmcblk2), raw env at 4MiB
+/dev/mmcblk2    0x400000    0x20000
+EOF
+
+# OpenRC service: mark the active RAUC slot as good after a successful boot.
+# If this service never runs (e.g. boot crash), U-Boot decrements the attempt
+# counter until it reaches 0 and automatically falls back to the other slot.
+cat > "${SYSROOT}/etc/init.d/rauc-mark-good" <<'INITEOF'
+#!/sbin/openrc-run
+
+description="Mark active RAUC slot as good after successful boot"
+
+depend() {
+    after networking
+    after logger
+}
+
+start() {
+    ebegin "Marking RAUC slot as good"
+    if command -v rauc >/dev/null 2>&1; then
+        rauc status mark-good 2>&1 | logger -t rauc-mark-good || true
+    else
+        ewarn "rauc not found — skipping mark-good"
+    fi
+    eend 0
+}
+INITEOF
+chmod +x "${SYSROOT}/etc/init.d/rauc-mark-good"
+ln -sf /etc/init.d/rauc-mark-good \
+    "${SYSROOT}/etc/runlevels/default/rauc-mark-good"
+echo "    rauc-mark-good OpenRC service installed."
+
 # ── Create default user ────────────────────────────────────────────────────────
 
 echo "==> Creating default user..."
 mkdir -p "${SYSROOT}/home/root"
-adduser -D -s /bin/bash root || true
 
 # ── Install kernel modules ───────────────────────────────────────────────────
 

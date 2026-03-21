@@ -68,7 +68,9 @@ trap cleanup EXIT
 UBOOT_BIN="${UBOOT_BUILD}/u-boot-sunxi-with-spl.bin"
 KERNEL="${KERNEL_BUILD}/zImage"
 DTB="${KERNEL_BUILD}/sun9i-a80-cubieboard4.dtb"
-BOOT_SCR="${UBOOT_BUILD}/boot.scr"
+# SD bootstrap image uses the single-slot SD boot script (not the RAUC A/B one)
+BOOT_SCR="${UBOOT_BUILD}/boot-sd.scr"
+[[ -f "${BOOT_SCR}" ]] || BOOT_SCR="${UBOOT_BUILD}/boot.scr"   # fallback for older builds
 
 [[ -f "${UBOOT_BIN}" ]] || die "U-Boot binary not found — run scripts/build-uboot.sh"
 [[ -f "${KERNEL}"   ]] || die "zImage not found — run scripts/build-kernel.sh"
