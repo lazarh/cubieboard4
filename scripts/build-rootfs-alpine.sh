@@ -157,15 +157,24 @@ cat > "${SYSROOT}/etc/hosts" <<EOF
 EOF
 
 # ── Configure network ───────────────────────────────────────────────────────────
+# Use dhcpcd as the sole DHCP client. Keep /etc/network/interfaces for lo only
+# so the 'networking' OpenRC service doesn't race dhcpcd on eth0.
 
 mkdir -p "${SYSROOT}/etc/network"
-
 cat > "${SYSROOT}/etc/network/interfaces" <<EOF
 auto lo
 iface lo inet loopback
+EOF
 
-auto eth0
-iface eth0 inet dhcp
+# dhcpcd: ignore virtual/internal interfaces that don't need DHCP
+mkdir -p "${SYSROOT}/etc"
+cat > "${SYSROOT}/etc/dhcpcd.conf" <<'EOF'
+# CubieBoard4 dhcpcd configuration
+# Ignore virtual interfaces
+denyinterfaces dummy* lo
+
+# Fast link detection
+timeout 30
 EOF
 
 # ── WiFi configuration ─────────────────────────────────────────────────────────
@@ -256,7 +265,7 @@ done
 
 # default — user-space services
 mkdir -p "${SYSROOT}/etc/runlevels/default"
-for svc in networking dhcpcd sshd chronyd dbus; do
+for svc in dhcpcd sshd chronyd dbus; do
     [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
         ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/default/${svc}"
 done
