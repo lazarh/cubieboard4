@@ -19,6 +19,10 @@
 #   Slot A  →  mmc 1:1 /boot (FAT, shared)  +  /dev/mmcblk2p2 (rootfsA)
 #   Slot B  →  mmc 1:1 /boot (FAT, shared)  +  /dev/mmcblk2p3 (rootfsB)
 
+# Ensure load addresses are set (may be absent if saved env lacks them)
+if test "${kernel_addr_r}" = ""; then setenv kernel_addr_r 0x80080000; fi
+if test "${fdt_addr_r}"    = ""; then setenv fdt_addr_r    0x8FA00000; fi
+
 setenv rauc_slot ""
 setenv rootpart ""
 

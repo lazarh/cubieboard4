@@ -101,6 +101,9 @@ BOOT_ORDER=A B
 BOOT_A_LEFT=3
 BOOT_B_LEFT=3
 bootdelay=2
+kernel_addr_r=0x80080000
+fdt_addr_r=0x8FA00000
+scriptaddr=0x8FC00000
 bootcmd=if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd
 EOF
 mkenvimage -s "${UBOOT_ENV_SIZE}" -o "${ENV_TMP}" "${ENV_TMP}.txt"
