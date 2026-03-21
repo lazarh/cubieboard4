@@ -65,13 +65,15 @@ sleep 5
 
 echo "==> Partitioning ${EMMC}..."
 wipefs -a "${EMMC}"
-parted -s "${EMMC}" mklabel msdos
-# p1: /boot FAT, 40–120MiB  (leaves first 40MiB for raw U-Boot + env)
-parted -s "${EMMC}" mkpart primary fat32   40MiB   120MiB
-# p2: rootfsA, 120MiB–3.5GiB
-parted -s "${EMMC}" mkpart primary ext4   120MiB  3700MiB
-# p3: rootfsB, 3.5GiB–end
-parted -s "${EMMC}" mkpart primary ext4  3700MiB   100%
+sfdisk "${EMMC}" <<'SFDISK_EOF'
+label: dos
+# p1: /boot FAT, 40MiB–120MiB  (leaves first 40MiB for raw U-Boot + env)
+start=40MiB,  size=80MiB,  type=b
+# p2: rootfsA, 120MiB–3700MiB
+start=120MiB, size=3580MiB, type=83
+# p3: rootfsB, 3700MiB–end
+start=3700MiB, size=+, type=83
+SFDISK_EOF
 partprobe "${EMMC}"
 sleep 2
 
