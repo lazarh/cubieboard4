@@ -71,8 +71,19 @@ if [[ "${APPLY_UBOOT_PATCHES}" == true ]]; then
         for patch in "${PATCHES_DIR}"/*.patch; do
             [[ -f "${patch}" ]] || continue
             echo "    Applying: $(basename "${patch}")"
-            patch -N -d "${UBOOT_SRC}" -p1 < "${patch}" || true
+            if ! patch -N -d "${UBOOT_SRC}" -p1 < "${patch}"; then
+                echo "    WARNING: patch failed or already applied (continuing)"
+            fi
         done
+
+        # Critical fix: get_mclk_offset() uses CONFIG_MACH_SUN9I_A80 which
+        # does not exist in U-Boot 2024.01; the correct symbol is MACH_SUN9I.
+        # Without this fix the eMMC clock register is never configured and
+        # eMMC fails to reinitialise after SPL boot on A80.  Apply via sed so
+        # it is idempotent even if patch 0005 applied (or failed) above.
+        sed -i 's/IS_ENABLED(CONFIG_MACH_SUN9I_A80)/IS_ENABLED(CONFIG_MACH_SUN9I)/g' \
+            "${UBOOT_SRC}/drivers/mmc/sunxi_mmc.c"
+        echo "    get_mclk_offset fix applied (idempotent)."
 
         # Fix pylibfdt setup.py for SWIG >= 4.2 compatibility.
         # SWIG 4.2 changed SWIG_Python_AppendOutput from 2 to 3 arguments, but
