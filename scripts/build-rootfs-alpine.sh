@@ -49,15 +49,24 @@ mkdir -p "${REPO_ROOT}/build/sources"
 
 ALPINE_TARBALL="alpine-minirootfs-${ALPINE_VERSION}-${ARCH}.tar.gz"
 ALPINE_URL="${ALPINE_MIRROR}/v${ALPINE_VERSION}/releases/${ARCH}/${ALPINE_TARBALL}"
+ALPINE_CACHED="${REPO_ROOT}/build/sources/${ALPINE_TARBALL}"
 
 echo "==> Downloading Alpine minirootfs..."
-if [[ ! -f "${REPO_ROOT}/build/sources/${ALPINE_TARBALL}" ]]; then
-    wget -q -O "${REPO_ROOT}/build/sources/${ALPINE_TARBALL}" "${ALPINE_URL}" || \
-        die "Failed to download Alpine rootfs"
+# Remove zero-byte or corrupt stub files left by failed previous downloads
+if [[ -f "${ALPINE_CACHED}" && ! -s "${ALPINE_CACHED}" ]]; then
+    echo "    Removing empty/corrupt cached file: ${ALPINE_CACHED}"
+    rm -f "${ALPINE_CACHED}"
+fi
+if [[ ! -f "${ALPINE_CACHED}" ]]; then
+    wget --show-progress -O "${ALPINE_CACHED}.tmp" "${ALPINE_URL}" \
+        && mv "${ALPINE_CACHED}.tmp" "${ALPINE_CACHED}" \
+        || { rm -f "${ALPINE_CACHED}.tmp"; die "Failed to download Alpine rootfs from ${ALPINE_URL}"; }
+else
+    echo "    Using cached ${ALPINE_CACHED}"
 fi
 
 echo "==> Extracting to ${SYSROOT}..."
-tar -xzf "${REPO_ROOT}/build/sources/${ALPINE_TARBALL}" -C "${SYSROOT}" --strip-components=1
+tar -xzf "${ALPINE_CACHED}" -C "${SYSROOT}" --strip-components=1
 
 # ── Install qemu-user-static for running armhf binaries on x86_64 ──────────────────
 
