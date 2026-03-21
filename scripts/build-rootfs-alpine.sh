@@ -91,7 +91,9 @@ ALPINE_REPO_VERSION="${ALPINE_VERSION%.*}"
 cat > "${SYSROOT}/etc/apk/repositories" <<EOF
 https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_REPO_VERSION}/main
 https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_REPO_VERSION}/community
+@edgetesting https://dl-cdn.alpinelinux.org/alpine/edge/testing
 EOF
+# Allow rauc to be pulled from edge/testing without upgrading everything else
 
 # ── Install base packages ─────────────────────────────────────────────────────
 
@@ -130,8 +132,8 @@ export QEMU_LD_PREFIX="${SYSROOT}"
     htop \
     tmux \
     chrony \
-    rauc \
-    uboot-tools
+    rauc@edgetesting \
+    u-boot-tools
 
 # ── Install wireless firmware for brcmfmac (AP6330) ────────────────────────────
 
