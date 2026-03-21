@@ -66,5 +66,5 @@ echo "RAUC: booting slot ${rauc_slot} (root=${rootpart})"
 
 load mmc 1:1 ${fdt_addr_r} sun9i-a80-cubieboard4.dtb
 load mmc 1:1 ${kernel_addr_r} zImage
-setenv bootargs console=ttyS0,115200 console=tty1 root=${rootpart} rootwait rw panic=10 rauc.slot=${rauc_slot} ${extra}
+setenv bootargs console=tty1 console=ttyS0,115200 root=${rootpart} rootwait rw panic=10 rauc.slot=${rauc_slot} ${extra}
 bootz ${kernel_addr_r} - ${fdt_addr_r}
