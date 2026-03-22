@@ -1,32 +1,22 @@
 #!/bin/bash
-# build-rootfs-kernel.sh — Install kernel modules into Debian/Alpine rootfs.
+# build-rootfs-kernel.sh — Install kernel modules into the Alpine rootfs.
 #
 # Must be run as root on an x86-64 Debian/Ubuntu build host.
 #
 # Prerequisites:
-#   build-rootfs-debootstrap.sh or build-rootfs-alpine.sh must have been run
+#   build-rootfs-alpine.sh must have been run
 #   scripts/build-kernel.sh must have been run
 #
 # Environment variables:
-#   ROOTFS_DISTRO=debian|alpine — Choose rootfs distro (default: debian)
 #   REBUILD_KERNEL=true — reinstall kernel modules even if version matches
 #
-# Produces: debian-rootfs/ or alpine-rootfs/ with kernel modules installed
+# Produces: alpine-rootfs/ with kernel modules installed
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
-ROOTFS_DISTRO="${ROOTFS_DISTRO:-debian}"
-case "${ROOTFS_DISTRO}" in
-    alpine)
-        SYSROOT="${REPO_ROOT}/alpine-rootfs"
-        ;;
-    debian|*)
-        SYSROOT="${REPO_ROOT}/debian-rootfs"
-        ;;
-esac
+SYSROOT="${REPO_ROOT}/alpine-rootfs"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 REBUILD_KERNEL="${REBUILD_KERNEL:-false}"
@@ -36,7 +26,7 @@ KERNEL_MODULES_STAMP="${SYSROOT}/.kernel_modules_done"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Must be run as root"
-[[ -d "${SYSROOT}" ]] || die "Rootfs not found — run build-rootfs-debootstrap.sh or build-rootfs-alpine.sh first"
+[[ -d "${SYSROOT}" ]] || die "Rootfs not found — run scripts/build-rootfs-alpine.sh first"
 [[ -d "${KERNEL_BUILD}" ]] || die "build/kernel/ not found — run scripts/build-kernel.sh first"
 [[ -f "${KERNEL_BUILD}/zImage" ]] || die "build/kernel/zImage not found — run scripts/build-kernel.sh first"
 

@@ -215,10 +215,10 @@ else
 fi
 
 # Compile the RAUC boot script so U-Boot loads it and executes RAUC A/B logic.
-# The BOOTCOMMAND just runs the script; slot selection is inside boot-emmc-rauc.cmd.
-# Fall back to distro_bootcmd for initial SD-card installs (when mmc 1 is absent).
+# Prefer an inserted SD card first (mmc 0), then fall back to the eMMC RAUC
+# script on mmc 1, then finally fall back to distro_bootcmd.
 cat >> "${BUILD_DIR}/.config" << 'UBOOT_CFG'
-CONFIG_BOOTCOMMAND="if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd"
+CONFIG_BOOTCOMMAND="if mmc dev 0; then load mmc 0:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd"
 UBOOT_CFG
 
 # ── Build ──────────────────────────────────────────────────────────────────

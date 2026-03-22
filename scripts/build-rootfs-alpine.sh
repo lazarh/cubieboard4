@@ -139,13 +139,28 @@ export QEMU_LD_PREFIX="${SYSROOT}"
     htop \
     tmux \
     chrony \
+    docker \
     rauc@edgetesting \
-    u-boot-tools
+    u-boot-tools \
+    nginx
 
 # ── Install wireless firmware for brcmfmac (AP6330) ────────────────────────────
 
 echo "==> Installing WiFi firmware..."
 "${SYSROOT}/sbin/apk" add --no-cache linux-firmware-brcm
+
+# The stock Alpine sysctl profile enables a few knobs that this kernel does not
+# expose (notably some IPv6 and SYN-cookie settings). Drop those entries so the
+# boot-time sysctl service stays quiet on CubieBoard4.
+if [[ -f "${SYSROOT}/lib/sysctl.d/00-alpine.conf" ]]; then
+    sed -i \
+        -e '/^net\.ipv4\.tcp_syncookies[[:space:]=]/d' \
+        -e '/^net\.ipv6\.conf\.all\.accept_redirects[[:space:]=]/d' \
+        -e '/^net\.ipv6\.conf\.all\.accept_source_route[[:space:]=]/d' \
+        -e '/^net\.ipv6\.conf\.default\.use_tempaddr[[:space:]=]/d' \
+        -e '/^net\.ipv6\.conf\.all\.use_tempaddr[[:space:]=]/d' \
+        "${SYSROOT}/lib/sysctl.d/00-alpine.conf"
+fi
 
 # ── Configure hostname ──────────────────────────────────────────────────────────
 
@@ -277,26 +292,31 @@ echo "==> Enabling services..."
 
 # sysinit — kernel interfaces and device manager
 mkdir -p "${SYSROOT}/etc/runlevels/sysinit"
-for svc in devfs dmesg hwdrivers mdev seedrng; do
+for svc in devfs dmesg hwdrivers seedrng udev; do
     [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
         ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/sysinit/${svc}"
 done
+rm -f "${SYSROOT}/etc/runlevels/sysinit/mdev"
 
 # boot — filesystem remount (rw), hostname, modules, misc
 mkdir -p "${SYSROOT}/etc/runlevels/boot"
-for svc in sysfs procfs fsck localmount modules swap sysctl bootmisc hostname klogd; do
+for svc in sysfs procfs fsck localmount modules swap sysctl bootmisc hostname \
+           cgroups udev-trigger udev-settle; do
     [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
         ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/boot/${svc}"
 done
+rm -f "${SYSROOT}/etc/runlevels/boot/klogd"
 
 # default — user-space services
 mkdir -p "${SYSROOT}/etc/runlevels/default"
-for svc in dhcpcd sshd chronyd dbus; do
+for svc in dhcpcd sshd chronyd dbus docker; do
     [[ -f "${SYSROOT}/etc/init.d/${svc}" ]] && \
         ln -sf /etc/init.d/${svc} "${SYSROOT}/etc/runlevels/default/${svc}"
 done
 # Remove dangling serial symlink added by agetty-openrc post-install
 rm -f "${SYSROOT}/etc/runlevels/default/serial"
+# dhcpcd is our only network manager; avoid redundant ifupdown-ng startup.
+rm -f "${SYSROOT}/etc/runlevels/default/networking"
 
 # ── RAUC configuration ──────────────────────────────────────────────────────────
 
@@ -316,6 +336,52 @@ else
     echo "    Run scripts/gen-rauc-cert.sh to generate the dev certificate,"
     echo "    then re-run this script (or copy ca.cert.pem to /etc/rauc/ manually)."
 fi
+
+# Install D-Bus metadata for RAUC so the CLI can activate or talk to
+# de.pengutronix.rauc reliably on Alpine/OpenRC systems.
+mkdir -p "${SYSROOT}/usr/share/dbus-1/system-services" "${SYSROOT}/usr/share/dbus-1/system.d"
+cat > "${SYSROOT}/usr/share/dbus-1/system-services/de.pengutronix.rauc.service" <<'EOF'
+[D-BUS Service]
+Name=de.pengutronix.rauc
+Exec=/usr/bin/rauc service
+User=root
+EOF
+cat > "${SYSROOT}/usr/share/dbus-1/system.d/de.pengutronix.rauc.conf" <<'EOF'
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy user="root">
+    <allow own="de.pengutronix.rauc"/>
+    <allow send_destination="de.pengutronix.rauc"/>
+    <allow receive_sender="de.pengutronix.rauc"/>
+  </policy>
+  <policy context="default">
+    <allow send_destination="de.pengutronix.rauc"/>
+  </policy>
+</busconfig>
+EOF
+echo "    RAUC D-Bus service metadata installed."
+
+# OpenRC service: run the RAUC D-Bus service daemon on boot so `rauc install`
+# has a persistent service even if D-Bus activation is unavailable.
+cat > "${SYSROOT}/etc/init.d/rauc" <<'INITEOF'
+#!/sbin/openrc-run
+
+description="RAUC D-Bus service"
+command=/usr/bin/rauc
+command_args="service"
+command_background=true
+pidfile=/run/rauc.pid
+start_stop_daemon_args="--make-pidfile --stdout /var/log/rauc.log --stderr /var/log/rauc.log"
+
+depend() {
+    need dbus
+    after dbus
+}
+INITEOF
+chmod +x "${SYSROOT}/etc/init.d/rauc"
+ln -sf /etc/init.d/rauc "${SYSROOT}/etc/runlevels/default/rauc"
+echo "    rauc OpenRC service installed."
 
 # fw_env.config: tells fw_printenv/fw_setenv where U-Boot env lives on eMMC.
 # Must match CONFIG_ENV_OFFSET / CONFIG_ENV_SIZE in configs/uboot/rauc.config.

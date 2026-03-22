@@ -18,7 +18,11 @@ EMMC=/dev/mmcblk2
 BOOT_PART="${EMMC}p1"
 SLOT_A_PART="${EMMC}p2"
 SLOT_B_PART="${EMMC}p3"
-UBOOT_BIN=/boot/u-boot-sunxi-with-spl.bin
+UBOOT_CANDIDATES=(
+    /boot/u-boot-sunxi-with-spl.bin
+    /usr/local/share/cubieboard4/u-boot-sunxi-with-spl.bin
+)
+UBOOT_BIN=""
 
 # U-Boot raw env location (must match configs/uboot/rauc.config)
 UBOOT_ENV_OFFSET=$((4 * 1024 * 1024))   # 4MiB in bytes
@@ -37,11 +41,39 @@ trap cleanup EXIT
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+unmount_emmc_partitions() {
+    local part mountpoint
+
+    while read -r part mountpoint; do
+        [[ -n "${part}" ]] || continue
+        [[ "${part}" != "${EMMC}" ]] || continue
+
+        if grep -q "^${part}[[:space:]]" /proc/swaps 2>/dev/null; then
+            echo "==> Disabling swap on ${part}..."
+            swapoff "${part}" || die "Failed to disable swap on ${part}"
+        fi
+
+        if [[ -n "${mountpoint:-}" ]]; then
+            echo "==> Unmounting ${part} from ${mountpoint}..."
+            umount "${part}" 2>/dev/null || \
+                umount "${mountpoint}" 2>/dev/null || \
+                die "Failed to unmount ${part} (${mountpoint})"
+        fi
+    done < <(lsblk -nrpo NAME,MOUNTPOINT "${EMMC}")
+}
+
 # ── Preflight checks ────────────────────────────────────────────────────────
 
 [[ $EUID -eq 0 ]] || die "Must be run as root"
 [[ -b "${EMMC}" ]] || die "${EMMC} not found — is the eMMC recognised by the kernel?"
-[[ -f "${UBOOT_BIN}" ]] || die "${UBOOT_BIN} not found"
+
+for candidate in "${UBOOT_CANDIDATES[@]}"; do
+    if [[ -f "${candidate}" ]]; then
+        UBOOT_BIN="${candidate}"
+        break
+    fi
+done
+[[ -n "${UBOOT_BIN}" ]] || die "U-Boot binary not found in ${UBOOT_CANDIDATES[*]}"
 
 command -v mkenvimage >/dev/null || \
     die "mkenvimage not found — install u-boot-tools (apk add uboot-tools)"
@@ -64,6 +96,7 @@ sleep 5
 # ── Partition eMMC ─────────────────────────────────────────────────────────
 
 echo "==> Partitioning ${EMMC}..."
+unmount_emmc_partitions
 wipefs -a "${EMMC}"
 sfdisk "${EMMC}" <<'SFDISK_EOF'
 label: dos
@@ -104,7 +137,7 @@ bootdelay=2
 kernel_addr_r=0x80080000
 fdt_addr_r=0x8FA00000
 scriptaddr=0x8FC00000
-bootcmd=if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd
+bootcmd=if mmc dev 0; then load mmc 0:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; if mmc dev 1; then load mmc 1:1 ${scriptaddr} boot.scr && source ${scriptaddr}; fi; run distro_bootcmd
 EOF
 mkenvimage -s "${UBOOT_ENV_SIZE}" -o "${ENV_TMP}" "${ENV_TMP}.txt"
 dd if="${ENV_TMP}" of="${EMMC}" \
@@ -174,4 +207,3 @@ echo "    RAUC env initialised: BOOT_ORDER='A B', attempts=3"
 echo ""
 echo "    Power off, remove the SD card, and reboot from eMMC."
 echo "    After first eMMC boot, verify RAUC with: rauc status"
-

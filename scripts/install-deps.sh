@@ -20,12 +20,12 @@ apt-get install -y --no-install-recommends \
     libncurses-dev \
     device-tree-compiler \
     u-boot-tools \
-    debootstrap \
     qemu-user-static \
     binfmt-support \
     parted \
     dosfstools \
     e2fsprogs \
+    squashfs-tools \
     rsync \
     pigz \
     bmap-tools \
@@ -33,7 +33,8 @@ apt-get install -y --no-install-recommends \
     wget \
     xz-utils \
     ca-certificates \
-    git
+    git \
+    rauc
 
 echo ""
 echo "==> All build dependencies installed."

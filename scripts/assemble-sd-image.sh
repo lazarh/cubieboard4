@@ -4,16 +4,12 @@
 # Prerequisites (run in order):
 #   1. scripts/build-uboot.sh
 #   2. scripts/build-kernel.sh
-#   3. sudo ROOTFS_DISTRO=debian|alpine scripts/build-rootfs.sh
+#   3. sudo scripts/build-rootfs.sh
 #
 # Must be run as root (loop device + mount).
 #
-# Environment variables:
-#   ROOTFS_DISTRO=debian|alpine — Choose rootfs distro (default: debian)
-#
 # Output:
-#   cubieboard4-debian13.img   (default for Debian)
-#   cubieboard4-alpine.img     (default for Alpine)
+#   cubieboard4-alpine.img
 #   The script will also produce a compressed image (same path with .gz) and an
 #   optional .bmap file for use with bmaptool when available.
 #
@@ -25,18 +21,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-ROOTFS_DISTRO="${ROOTFS_DISTRO:-debian}"
-
-case "${ROOTFS_DISTRO}" in
-    alpine)
-        SYSROOT="${REPO_ROOT}/alpine-rootfs"
-        OUTPUT="${1:-${REPO_ROOT}/cubieboard4-alpine.img}"
-        ;;
-    debian|*)
-        SYSROOT="${REPO_ROOT}/debian-rootfs"
-        OUTPUT="${1:-${REPO_ROOT}/cubieboard4-debian13.img}"
-        ;;
-esac
+SYSROOT="${REPO_ROOT}/alpine-rootfs"
+OUTPUT="${1:-${REPO_ROOT}/cubieboard4-alpine.img}"
 
 UBOOT_BUILD="${REPO_ROOT}/build/uboot"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
@@ -61,7 +47,7 @@ WORK_DIR=$(mktemp -d)
 trap cleanup EXIT
 
 [[ $EUID -eq 0 ]] || die "Must be run as root"
-[[ -d "${SYSROOT}" ]] || die "${ROOTFS_DISTRO}-rootfs/ not found — run ROOTFS_DISTRO=${ROOTFS_DISTRO} scripts/build-rootfs.sh first"
+[[ -d "${SYSROOT}" ]] || die "alpine-rootfs/ not found — run scripts/build-rootfs.sh first"
 
 # ── Locate artifacts ───────────────────────────────────────────────────────
 

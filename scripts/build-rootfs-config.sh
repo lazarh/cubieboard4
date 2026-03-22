@@ -1,34 +1,23 @@
 #!/bin/bash
-# build-rootfs-config.sh — Configure system settings in Debian/Alpine rootfs.
+# build-rootfs-config.sh — Configure system settings in the Alpine rootfs.
 #
 # Must be run as root on an x86-64 Debian/Ubuntu build host.
 #
 # Prerequisites:
-#   build-rootfs-debootstrap.sh or build-rootfs-alpine.sh must have been run
-#   build-rootfs-packages.sh should have been run (Debian only)
+#   build-rootfs-alpine.sh must have been run
 #
 # Environment variables:
-#   ROOTFS_DISTRO=debian|alpine — Choose rootfs distro (default: debian)
 #   BOARD_HOSTNAME=myboard — set board hostname (default: cubieboard4)
 #   WIFI_SSID=MyNetwork   — pre-configure WiFi (requires WIFI_PASSWORD)
 #   WIFI_PASSWORD=secret  — WPA2 passphrase for WIFI_SSID
 #
-# Produces: debian-rootfs/ or alpine-rootfs/
+# Produces: alpine-rootfs/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
-ROOTFS_DISTRO="${ROOTFS_DISTRO:-debian}"
-case "${ROOTFS_DISTRO}" in
-    alpine)
-        SYSROOT="${REPO_ROOT}/alpine-rootfs"
-        ;;
-    debian|*)
-        SYSROOT="${REPO_ROOT}/debian-rootfs"
-        ;;
-esac
+SYSROOT="${REPO_ROOT}/alpine-rootfs"
 KERNEL_BUILD="${REPO_ROOT}/build/kernel"
 MODULES_DIR="${KERNEL_BUILD}/modules"
 
@@ -39,7 +28,7 @@ WIFI_PASSWORD="${WIFI_PASSWORD:-}"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Must be run as root"
-[[ -d "${SYSROOT}" ]] || die "Rootfs not found — run scripts/build-rootfs-debootstrap.sh first"
+[[ -d "${SYSROOT}" ]] || die "Rootfs not found — run scripts/build-rootfs-alpine.sh first"
 
 # Ensure QEMU is present
 if [[ ! -f "${SYSROOT}/usr/bin/qemu-arm-static" ]]; then
@@ -84,32 +73,11 @@ EOF
 
 # ── Locale ───────────────────────────────────────────────────────────────
 
-# Alpine doesn't use locale-gen (uses musl)
-if [[ "${ROOTFS_DISTRO}" != "alpine" ]]; then
-    if ! grep -q "en_US.UTF-8 UTF-8" "${SYSROOT}/etc/locale.gen" 2>/dev/null; then
-        echo "==> Configuring locale..."
-        echo "en_US.UTF-8 UTF-8" >> "${SYSROOT}/etc/locale.gen"
-        chroot "${SYSROOT}" locale-gen
-    else
-        echo "    Locale already configured."
-    fi
-else
-    echo "    Skipping locale config (Alpine uses musl)"
-fi
+echo "    Skipping locale config (Alpine uses musl)"
 
 # ── Timezone ─────────────────────────────────────────────────────────────
 
-if [[ "${ROOTFS_DISTRO}" != "alpine" ]]; then
-    if [[ "$(cat "${SYSROOT}/etc/timezone" 2>/dev/null)" != "UTC" ]]; then
-        echo "==> Setting timezone to UTC..."
-        echo "UTC" > "${SYSROOT}/etc/timezone"
-        chroot "${SYSROOT}" dpkg-reconfigure -f noninteractive tzdata || true
-    else
-        echo "    Timezone already set to UTC."
-    fi
-else
-    echo "    Skipping timezone config (Alpine)"
-fi
+echo "    Skipping timezone config (Alpine)"
 
 # ── /etc/fstab ──────────────────────────────────────────────────────────
 
@@ -122,14 +90,7 @@ mkdir -p "${SYSROOT}/boot"
 
 # ── Serial console ──────────────────────────────────────────────────────
 
-if [[ "${ROOTFS_DISTRO}" == "alpine" ]]; then
-    echo "    Skipping serial console enable (already configured by build-rootfs-alpine.sh)"
-elif [[ ! -L "${SYSROOT}/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service" ]]; then
-    echo "==> Enabling serial console..."
-    chroot "${SYSROOT}" systemctl enable serial-getty@ttyS0.service || true
-else
-    echo "    Serial console already enabled."
-fi
+echo "    Skipping serial console enable (already configured by build-rootfs-alpine.sh)"
 
 # ── SSH ──────────────────────────────────────────────────────────────────
 
@@ -137,23 +98,13 @@ if ! grep -q "^PermitRootLogin yes" "${SYSROOT}/etc/ssh/sshd_config" 2>/dev/null
     echo "==> Configuring sshd..."
     sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' "${SYSROOT}/etc/ssh/sshd_config"
     sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' "${SYSROOT}/etc/ssh/sshd_config"
-    if [[ "${ROOTFS_DISTRO}" != "alpine" ]]; then
-        chroot "${SYSROOT}" systemctl enable ssh.service || true
-    fi
 else
     echo "    SSH already configured."
 fi
 
 # ── NTP ───────────────────────────────────────────────────────────────────
 
-if [[ "${ROOTFS_DISTRO}" == "alpine" ]]; then
-    echo "    Skipping NTP enable (chrony managed by OpenRC via build-rootfs-alpine.sh)"
-elif [[ ! -L "${SYSROOT}/etc/systemd/system/systemd-timesyncd.service" ]]; then
-    echo "==> Enabling NTP..."
-    chroot "${SYSROOT}" systemctl enable systemd-timesyncd.service || true
-else
-    echo "    NTP already enabled."
-fi
+echo "    Skipping NTP enable (chrony managed by OpenRC via build-rootfs-alpine.sh)"
 
 # ── sysctl tweaks ───────────────────────────────────────────────────────
 
@@ -230,26 +181,19 @@ fi
 
 # ── Embed install-to-emmc.sh ──────────────────────────────────────────────
 
-if [[ ! -f "${SYSROOT}/usr/local/sbin/install-to-emmc.sh" ]]; then
-    echo "==> Embedding install-to-emmc.sh..."
-    mkdir -p "${SYSROOT}/usr/local/sbin"
-    install -m 0755 "${SCRIPT_DIR}/install-to-emmc.sh" \
-        "${SYSROOT}/usr/local/sbin/install-to-emmc.sh"
-else
-    echo "    install-to-emmc.sh already embedded."
-fi
+echo "==> Refreshing install-to-emmc.sh..."
+mkdir -p "${SYSROOT}/usr/local/sbin"
+install -m 0755 "${SCRIPT_DIR}/install-to-emmc.sh" \
+    "${SYSROOT}/usr/local/sbin/install-to-emmc.sh"
 
-# ── Copy U-Boot binary to /boot ──────────────────────────────────────────
+# ── Embed U-Boot binary for install-to-emmc.sh ──────────────────────────
 
 UBOOT_BIN="${REPO_ROOT}/build/uboot/u-boot-sunxi-with-spl.bin"
 if [[ -f "${UBOOT_BIN}" ]]; then
-    if [[ ! -f "${SYSROOT}/boot/u-boot-sunxi-with-spl.bin" ]]; then
-        echo "==> Copying U-Boot to /boot..."
-        mkdir -p "${SYSROOT}/boot"
-        install -m 0644 "${UBOOT_BIN}" "${SYSROOT}/boot/u-boot-sunxi-with-spl.bin"
-    else
-        echo "    U-Boot already in /boot."
-    fi
+    echo "==> Refreshing embedded U-Boot binary..."
+    mkdir -p "${SYSROOT}/usr/local/share/cubieboard4"
+    install -m 0644 "${UBOOT_BIN}" \
+        "${SYSROOT}/usr/local/share/cubieboard4/u-boot-sunxi-with-spl.bin"
 else
     echo "    WARNING: ${UBOOT_BIN} not found."
 fi
@@ -257,43 +201,12 @@ fi
 # ── Root password ────────────────────────────────────────────────────────
 
 echo "==> Setting root password to 'root' (change after first boot!)"
-# Use chpasswd with SHA512 (default in Debian)
 chroot "${SYSROOT}" bash -c 'echo "root:root" | chpasswd'
 
 # ── WiFi pre-configuration ──────────────────────────────────────────────
 
-NM_DIR="${SYSROOT}/etc/NetworkManager/system-connections"
-if [[ "${ROOTFS_DISTRO}" == "alpine" ]]; then
-    echo "    Skipping NetworkManager WiFi config (Alpine uses wpa_supplicant)"
-elif [[ -n "${WIFI_SSID}" && -n "${WIFI_PASSWORD}" ]]; then
-    if [[ -f "${NM_DIR}/wifi-preconfigured.nmconnection" ]]; then
-        echo "==> WiFi already pre-configured (skipping)."
-    else
-        echo "==> Pre-configuring WiFi for SSID: ${WIFI_SSID}"
-        mkdir -p "${NM_DIR}"
-        cat > "${NM_DIR}/wifi-preconfigured.nmconnection" <<EOF
-[connection]
-id=${WIFI_SSID}
-type=wifi
-autoconnect=true
-
-[wifi]
-ssid=${WIFI_SSID}
-mode=infrastructure
-
-[wifi-security]
-key-mgmt=wpa-psk
-psk=${WIFI_PASSWORD}
-
-[ipv4]
-method=auto
-
-[ipv6]
-addr-gen-mode=default
-method=auto
-EOF
-        chmod 600 "${NM_DIR}/wifi-preconfigured.nmconnection"
-    fi
+if [[ -n "${WIFI_SSID}" && -n "${WIFI_PASSWORD}" ]]; then
+    echo "    Skipping WiFi pre-configuration (already handled by build-rootfs-alpine.sh)"
 elif [[ -n "${WIFI_SSID}" || -n "${WIFI_PASSWORD}" ]]; then
     echo "    WARNING: Both WIFI_SSID and WIFI_PASSWORD must be set to pre-configure WiFi."
 fi

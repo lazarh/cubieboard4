@@ -3,9 +3,9 @@
 #
 # Prerequisites:
 #   scripts/gen-rauc-cert.sh       — run once to generate the signing certificate
-#   scripts/build-rootfs.sh        — rootfs must be built (ROOTFS_DISTRO=alpine)
+#   scripts/build-rootfs.sh        — rootfs must be built
 #   scripts/build-kernel.sh        — kernel modules must be built
-#   rauc                           — installed on the build host (apt install rauc)
+#   rauc and squashfs-tools        — installed on the build host
 #
 # Usage:
 #   scripts/build-rauc-bundle.sh
@@ -16,6 +16,7 @@
 #   VERSION        — bundle version string  (default: YYYYMMDD-HHMMSS)
 #   ROOTFS_DIR     — rootfs source dir      (default: alpine-rootfs/)
 #   ROOTFS_SIZE_MB — ext4 image size in MiB (default: 1800)
+#   BUNDLE_FORMAT  — RAUC bundle format     (default: verity)
 #   OUTPUT_DIR     — where to write .raucb  (default: repo root)
 #
 # Output:
@@ -29,6 +30,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSION="${VERSION:-$(date +%Y%m%d-%H%M%S)}"
 ROOTFS_DIR="${ROOTFS_DIR:-${REPO_ROOT}/alpine-rootfs}"
 ROOTFS_SIZE_MB="${ROOTFS_SIZE_MB:-1800}"
+BUNDLE_FORMAT="${BUNDLE_FORMAT:-verity}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}}"
 
 CERT_FILE="${REPO_ROOT}/configs/rauc/dev-cert/ca.cert.pem"
@@ -59,6 +61,9 @@ trap cleanup EXIT
 
 command -v rauc      >/dev/null || die "rauc not found on build host — apt install rauc"
 command -v mkfs.ext4 >/dev/null || die "mkfs.ext4 not found — apt install e2fsprogs"
+command -v mksquashfs >/dev/null || die "mksquashfs not found on build host — apt install squashfs-tools"
+[[ "${BUNDLE_FORMAT}" == "plain" || "${BUNDLE_FORMAT}" == "verity" ]] || \
+    die "Unsupported BUNDLE_FORMAT=${BUNDLE_FORMAT} (use plain or verity)"
 
 echo "========================================"
 echo "  CubieBoard4 RAUC Bundle Builder"
@@ -66,6 +71,7 @@ echo "========================================"
 echo "  Version    : ${VERSION}"
 echo "  Rootfs     : ${ROOTFS_DIR}"
 echo "  Image size : ${ROOTFS_SIZE_MB} MiB"
+echo "  Format     : ${BUNDLE_FORMAT}"
 echo "  Output     : ${OUTPUT_BUNDLE}"
 echo "========================================"
 echo ""
@@ -106,11 +112,17 @@ cat > "${BUNDLE_STAGING}/manifest.raucm" <<EOF
 compatible=${COMPATIBLE}
 version=${VERSION}
 
+[bundle]
+format=${BUNDLE_FORMAT}
+
 [image.rootfs]
 filename=rootfs.ext4
 EOF
 
 echo "==> Manifest written."
+if [[ "${BUNDLE_FORMAT}" == "verity" ]]; then
+    echo "    Verity bundle enabled for HTTP streaming installs."
+fi
 
 # ── Sign and create bundle ─────────────────────────────────────────────────
 
